@@ -21,46 +21,28 @@ class HashedWheelTimerTest extends Specification {
                 .withResolution(resolution.toNanos(), TimeUnit.MICROSECONDS)
                 .withWheelSize(wheelSize)
                 .withWaitStrategy(waitStrategy)
-                .build().start()
+                .build()
 
         return timer
     }
 
-    def "should be able to set a variable"() {
-        when:
-        def three = 3
-        def test = System.nanoTime()
-
-        then:
-        three == 3
-    }
-
     def "should be able to schedule a one-shot task"() {
-        when:
-        def waitStrategy = new WaitStrategy.BusySpinWait()
-        def timer = oneShotTimer(Duration.ofMillis(1), 512, waitStrategy)
-//        timer.start()
+        setup: "create, start, and prime the timer"
+        def timer = oneShotTimer(Duration.ofMillis(1), 512, WaitStrategies.busySpinWait())
+        timer.start()
+        timer.schedule({ -> System.nanoTime()}, 10, TimeUnit.MILLISECONDS).get()
 
-        and:
-        def executedTime = 0
-        timer.schedule({ -> executedTime = System.nanoTime()}, 10, TimeUnit.MILLISECONDS)
-        timer.schedule({ -> executedTime = System.nanoTime()}, 10, TimeUnit.MILLISECONDS)
+        when: "we schedule a task with a 10 ms delay"
         def start = System.nanoTime()
-        timer.schedule({ -> executedTime = System.nanoTime()}, 10, TimeUnit.MILLISECONDS)
+        def executedTime = timer.schedule({ -> System.nanoTime()}, 10, TimeUnit.MILLISECONDS).get()
 
-        and:
-        sleep(15)
+        and: "and calculate the actual delay"
+        def delay = (executedTime - start) / 1e3 as Long
 
-        and:
-        def delay = (executedTime - start) / 1e6 as Long
+        then: "the error should be within 1.5 percent (i.e. 1.5 ms)"
+        Math.abs(delay - 10_000) <= 1500
 
-        then:
-        delay > 9
-
-        and:
-        delay < 11
-//
-//        cleanup:
-//        if(timer != null) timer.shutdown()
+        cleanup: "shutdown the timer"
+        timer.shutdown()
     }
 }

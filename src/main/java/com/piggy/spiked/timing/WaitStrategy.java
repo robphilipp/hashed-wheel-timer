@@ -2,18 +2,6 @@ package com.piggy.spiked.timing;
 
 public interface WaitStrategy {
 
-    static BusySpinWait busySpinWait() {
-        return new BusySpinWait();
-    }
-
-    static YieldingWait YieldingWait() {
-        return new YieldingWait();
-    }
-
-    static SleepWait sleepWait() {
-        return new SleepWait();
-    }
-
     /**
      * Wait until the given deadline, deadlineNanoseconds
      *
@@ -29,6 +17,9 @@ public interface WaitStrategy {
      * one, but is more scheduler-friendly.
      */
     class YieldingWait implements WaitStrategy {
+
+        // disable the constructor
+        YieldingWait() {}
 
         @Override
         public boolean waitUntil(long deadline) {
@@ -53,6 +44,9 @@ public interface WaitStrategy {
      */
     class BusySpinWait implements WaitStrategy {
 
+        // disable the constructor
+        BusySpinWait() {}
+
         @Override
         public boolean waitUntil(long deadline) {
             // System.nanoTime() takes about 200 ns to 250 ns
@@ -74,6 +68,9 @@ public interface WaitStrategy {
      * precise.
      */
     class SleepWait implements WaitStrategy {
+
+        // disable the constructor
+        SleepWait() {}
 
         @Override
         public boolean waitUntil(long deadline) {
