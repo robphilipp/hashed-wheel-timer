@@ -1,6 +1,23 @@
 package com.piggy.spiked.timing;
 
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.Function;
+
+@SuppressWarnings("ALL")
 public class WaitStrategies {
+
+    /**
+     * Returns a new strategy for the corresponding string-literal strategy name
+     * @param strategyLiteral
+     * @return An {@link Optional} holding the {@link WaitStrategy} corresponding to the
+     * specified strategy name; or an empty {@link Optional} if the strategy name was
+     * invalid.
+     */
+    public static Optional<WaitStrategy> from(final String strategyLiteral) {
+        return Strategy.from(strategyLiteral).map(Strategy::create);
+    }
+
     /**
      * BusySpin wait strategy.
      * <p>Current implementation has a resolution of approximately 5 µs but can take
@@ -35,4 +52,52 @@ public class WaitStrategies {
     public static WaitStrategy.SleepWait sleepWait() {
         return new WaitStrategy.SleepWait();
     }
+
+    /**
+     * An enumeration factory for the various wait strategies
+     */
+    public enum Strategy {
+        BUSY_SPIN("busy_spin", strategy -> busySpinWait()),
+        YIELDING_WAIT("yielding_wait", strategy -> yieldingWait()),
+        SLEEP_WAIT("sleep_wait", strategy -> sleepWait())
+        ;
+
+
+        private final String literal;
+        private final Function<Strategy, WaitStrategy> factory;
+
+        /**
+         * @param literal The string literal represenatation of the strategy
+         * @param factory The factory function to create the strategy
+         */
+        Strategy(final String literal, final Function<Strategy, WaitStrategy> factory) {
+            this.literal = literal;
+            this.factory = factory;
+        }
+
+        /**
+         * @return The string literal for the strategy
+         */
+        public String literal() {
+            return literal;
+        }
+
+        /**
+         * Invokes the factory function for the strategy
+         * @return A new instance of the strategy
+         */
+        public WaitStrategy create() {
+            return factory.apply(this);
+        }
+
+        /**
+         * @param literal The string literal name of the strategy
+         * @return An optional holding the corresponding {@link Strategy} enumeration; or an empty optional
+         * if the strategy literal was invalid
+         */
+        public static Optional<Strategy> from(final String literal) {
+            return Arrays.stream(values()).filter(value -> value.literal.equalsIgnoreCase(literal)).findAny();
+        }
+    }
+
 }
