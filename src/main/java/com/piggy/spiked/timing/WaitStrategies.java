@@ -10,7 +10,7 @@ public class WaitStrategies {
      * will occupy an entire core. Is more precise than Sleep wait strategy, but
      * consumes more resources.
      */
-    static WaitStrategy.BusySpinWait busySpinWait() {
+    public static WaitStrategy.BusySpinWait busySpinWait() {
         return new WaitStrategy.BusySpinWait();
     }
 
@@ -21,7 +21,7 @@ public class WaitStrategies {
      * by means of Thread.yield() call. This strategy is less precise than BusySpin
      * one, but is more scheduler-friendly.
      */
-    static WaitStrategy.YieldingWait yieldingWait() {
+    public static WaitStrategy.YieldingWait yieldingWait() {
         return new WaitStrategy.YieldingWait();
     }
 
@@ -32,7 +32,7 @@ public class WaitStrategies {
      * on the same processor. Uses less resources than BusySpin wait, but is less
      * precise.
      */
-    static WaitStrategy.SleepWait sleepWait() {
+    public static WaitStrategy.SleepWait sleepWait() {
         return new WaitStrategy.SleepWait();
     }
 }
