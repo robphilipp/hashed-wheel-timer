@@ -749,7 +749,7 @@ public class HashedWheelTimer {
                 LOGGER.error(message);
                 throw new IllegalStateException(message);
             }
-            if (units.convert(resolution, TimeUnit.MICROSECONDS) < 50) {
+            if (TimeUnit.MICROSECONDS.convert(resolution, units) < 50) {
                 final String message = String.format("Timer resolution must be 50 µs or greater; specified: %d %s", resolution, units.toString());
                 LOGGER.error(message);
                 throw new IllegalStateException(message);
@@ -764,7 +764,8 @@ public class HashedWheelTimer {
                 LOGGER.error(message);
                 throw new IllegalStateException(message);
             }
-            return new HashedWheelTimer(timerName, resolution, wheelSize, waitStrategy, executor);
+            final long resolutionNanos = TimeUnit.NANOSECONDS.convert(resolution, units);
+            return new HashedWheelTimer(timerName, resolutionNanos, wheelSize, waitStrategy, executor);
         }
     }
 }
