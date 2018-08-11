@@ -19,7 +19,7 @@ class HashedWheelTimerTest extends Specification {
         def timer = HashedWheelTimer.builder()
                 .withDefaultTimerName()
                 .withDefaultExecutor()
-                .withResolution(resolution.toNanos(), TimeUnit.MICROSECONDS)
+                .withResolution(resolution.toNanos(), TimeUnit.NANOSECONDS)
                 .withWheelSize(wheelSize)
                 .withWaitStrategy(waitStrategy)
                 .build()
@@ -35,6 +35,10 @@ class HashedWheelTimerTest extends Specification {
             case TimeUnit.SECONDS: return "s"
             default: return ""
         }
+    }
+
+    def timeFrom(long nanos, TimeUnit unit) {
+        return "${unit.convert(nanos, TimeUnit.NANOSECONDS)} ${units(unit)}"
     }
 
     def "should be able to schedule a one-shot task"() {
@@ -84,30 +88,82 @@ class HashedWheelTimerTest extends Specification {
         and: "the error should be within 15 percent (i.e. 1.5 ms)"
         def expectedDelayNanos = TimeUnit.NANOSECONDS.convert(Delay, DelayUnits)
         Math.abs(actualDelay - expectedDelayNanos) / expectedDelayNanos <= Accuracy
+        println "requested delay: ${delay}; actual delay: ${timeFrom(actualDelay, DelayUnits)}; resolution: ${resolution}"
 
         and:
         timer.shutdown()
 
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 15.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 10.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 5.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 5.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 5.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 3.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 3.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 3.00
-        100        | TimeUnit.MICROSECONDS | 100   | TimeUnit.MICROSECONDS | 512       | 3.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 15.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 10.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 5.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 5.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 5.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 3.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 3.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 3.00
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 3.00
 
-        100        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 2.00
-        100        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 0.50
-        100        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 0.35
-        100        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 0.35
+        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 2.00
+        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 0.50
+        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 0.35
+        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 0.35
         1          | TimeUnit.MILLISECONDS | 10    | TimeUnit.MILLISECONDS | 512       | 0.15
 
         resolution = "${Resolution} ${units(ResolutionUnits)}"
         delay = "${Delay} ${units(DelayUnits)}"
         accuracy = "${(Accuracy * 100 as Long)} %"
+    }
+
+    @Unroll
+    "one-shot task with delay of #delay and resolution #resolution should have most runs within #accuracy"() {
+        setup: "create, start, and prime the timer"
+        def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
+        def timer = oneShotTimer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
+
+        def expectedDelayNanos = TimeUnit.NANOSECONDS.convert(Delay, DelayUnits)
+//        List<TestResult> results = (1..Runs).collect({run ->
+//            def start = System.nanoTime()
+//            def executedTime = timer.schedule({ -> System.nanoTime() }, Delay, DelayUnits).get()
+//            def actual = executedTime - start
+//            return new TestResult(actual, actual - expectedDelayNanos)
+//        })
+        List<TestResult> results = []
+        for(int i = 0; i < Runs; ++i) {
+            def start = System.nanoTime()
+            def executedTime = timer.schedule({ -> System.nanoTime() }, Delay, DelayUnits).get()
+            def actual = executedTime - start
+            results << new TestResult(actual, actual - expectedDelayNanos)
+            sleep 10
+        }
+        def badRuns = results.count {result -> Math.abs(result.error / expectedDelayNanos - 1) > Accuracy}
+
+
+        expect: "the error should be within 15 percent (i.e. 1.5 ms)"
+        badRuns < 10
+        println "requested delay: ${delay}; resolution: ${resolution}; bad runs: ${badRuns}"
+
+        and:
+        timer.shutdown()
+
+        where:
+        Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Runs
+        100        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 1.0 | 1000
+        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 1.0 | 1000
+        1          | TimeUnit.MILLISECONDS | 10    | TimeUnit.MILLISECONDS | 512       | 1.0 | 100
+
+        resolution = "${Resolution} ${units(ResolutionUnits)}"
+        delay = "${Delay} ${units(DelayUnits)}"
+        accuracy = "${(Accuracy * 100 as Long)} %"
+    }
+
+    class TestResult {
+        long actual
+        long error
+        TestResult(actual, error) {
+            this.actual = actual
+            this.error = error
+        }
     }
 }
