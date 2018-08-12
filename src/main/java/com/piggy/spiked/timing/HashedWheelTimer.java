@@ -3,6 +3,7 @@ package com.piggy.spiked.timing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Time;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
@@ -192,7 +193,7 @@ public class HashedWheelTimer {
                 final int currentCursor = cursor.getAndUpdate(val -> (val + 1) % wheelSize);
 
                 // update the scheduled tasks
-                wheel.computeIfPresent(currentCursor, (index, scheduledTasks) -> {
+                wheel.computeIfPresent(wheelIndex(currentCursor), (index, scheduledTasks) -> {
                     // update the registration list based on the results of the call to process the task
                     // the task.process does the following:
                     // 1. executes the task if ready
@@ -242,6 +243,8 @@ public class HashedWheelTimer {
      * Schedule a task executed after an initial delay and then repeatedly with a delay of {@code period}
      * after the tasks has completed execution.
      * @param task The task to be executed
+     * @param timeout The duration of the timer
+     * @param timeoutUnits The units of the tiner duration
      * @param initialDelay The initial delay
      * @param period The periodic delay
      * @param unit The time unit associated with the delay and the period
@@ -249,12 +252,15 @@ public class HashedWheelTimer {
      * @return The future holding for the task
      */
     public <V> CompletableFuture<V> scheduleWithFixedDelay(final Supplier<V> task,
+                                                           final long timeout,
+                                                           final TimeUnit timeoutUnits,
                                                            final long initialDelay,
                                                            final long period,
                                                            final TimeUnit unit) {
         return scheduleFixedDelay(
                 TimeUnit.NANOSECONDS.convert(initialDelay, unit),
                 TimeUnit.NANOSECONDS.convert(period, unit),
+                Duration.ofNanos(TimeUnit.NANOSECONDS.convert(timeout, timeoutUnits)),
                 task
         );
     }
@@ -532,12 +538,14 @@ public class HashedWheelTimer {
      * task has completed, at specified periodic delay.
      * @param firstDelay The first delay (in nanoseconds) after which to execute the task
      * @param periodicDelay The periodic delay (in nanoseconds) after the task has completed, to execute the task
+     * @param timeout The duration of the periodic timer (time until it stops)
      * @param task The task to execute
      * @param <V> The return type of the task
      * @return The completable future with the result.
      */
     private <V> CompletableFuture<V> scheduleFixedDelay(final long firstDelay,
                                                         final long periodicDelay,
+                                                        final Duration timeout,
                                                         final Supplier<V> task) {
         // grab the start time so that we can correct the delay for the amount of time it took to
         // instantiate the scheduled tasks
@@ -559,7 +567,8 @@ public class HashedWheelTimer {
                 .withInitialDelayInfo(firstFireRounds, firstFireOffset)
                 .withRescheduling(this::reschedule)
                 .withExecutor(executor)
-                .withFixedDelay(task, periodicTimeAround, periodicFireOffset, Duration.ofNanos(Math.max(firstDelay, periodicDelay)))
+//                .withFixedDelay(task, periodicTimeAround, periodicFireOffset, Duration.ofNanos(Math.max(firstDelay, periodicDelay)))
+                .withFixedDelay(task, periodicTimeAround, periodicFireOffset, timeout)
                 .build();
 
         final long instantiationTime = System.nanoTime() - start;

@@ -123,17 +123,18 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
             return null;
         }
 
+        // todo for periodic processing need a scheduled executor to the task that cancels the timer (completes the task)
         // execute tasks that are ready
         if (remainingTimesAround.decrementAndGet() < 0) {
-            final Future<?> future = executorService.submit(() -> complete(task.get()));
             switch (scheduleType) {
                 case ONE_SHOT:
+                    executorService.submit(() -> complete(task.get()));
                     return null;
 
                 case FIXED_DELAY:
                     // wait for the task to complete, and then proceed to the fix-rate logic
                     try {
-                        future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                        executorService.submit(task::get);
                     } catch (Exception e) {
                         // empty on purpose
                     }
@@ -322,7 +323,10 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
                     throw new IllegalStateException(message);
                 }
                 if(scheduleType == FIXED_DELAY && (Objects.isNull(timeout) || timeout.isNegative() || timeout.isZero())) {
-                    final String message = "Fixed delay schedules require a task time-out that is a positive value";
+                    final String message = String.format(
+                            "Fixed delay schedules require a task time-out that is a positive value; timeout: %,d µs",
+                            timeout.toNanos() * 1000
+                            );
                     LOGGER.error(message);
                     throw new IllegalStateException(message);
                 }
