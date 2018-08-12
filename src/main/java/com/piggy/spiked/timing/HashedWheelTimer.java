@@ -572,7 +572,8 @@ public class HashedWheelTimer {
         final int adjustedOffset = wheelOffset(firstDelay - instantiationTime);
 
         // add the registration to the bucket the will be processed next. the cursor is always set to the
-        // bucket the will be processed next.
+        // bucket the will be processed next. note that when the wheel is set up, a concurrent skip list is
+        // added to each bucket, and so the an index will always be present
 //        System.out.println(String.format("instantiation time: %,d ns", instantiationTime));
         lock.lock();
         wheel.computeIfPresent(

@@ -3,24 +3,30 @@ package com.piggy.spiked.timing;
 public interface WaitStrategy {
 
     /**
-     * Wait until the given deadline, deadlineNanoseconds
+     * Wait until the given deadline (in nanoseconds from epoch)
      *
-     * @param deadlineNanoseconds deadline to wait for, in milliseconds
+     * @param deadline The deadline (in nanoseconds), until which to wait.
+     * @return {@code true} if the thread has been interrupted; {@code false} if the thread
+     * hasn't been interrupted
      */
-    boolean waitUntil(long deadlineNanoseconds);
+    boolean waitUntil(long deadline);
 
     /**
      * Yielding wait strategy.
      * <p>
      * Spins in the loop, until the deadline is reached. Releases the flow control
-     * by means of Thread.yield() call. This strategy is less precise than BusySpin
+     * by means of Thread.yield() call. This strategy is less precise than {@link BusySpinWait}
      * one, but is more scheduler-friendly.
      */
     class YieldingWait implements WaitStrategy {
 
         // disable the constructor
-        YieldingWait() {}
+        YieldingWait() {
+        }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean waitUntil(long deadline) {
             while (deadline > System.nanoTime()) {
@@ -45,8 +51,12 @@ public interface WaitStrategy {
     class BusySpinWait implements WaitStrategy {
 
         // disable the constructor
-        BusySpinWait() {}
+        BusySpinWait() {
+        }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean waitUntil(long deadline) {
             // System.nanoTime() takes about 200 ns to 250 ns
@@ -70,8 +80,12 @@ public interface WaitStrategy {
     class SleepWait implements WaitStrategy {
 
         // disable the constructor
-        SleepWait() {}
+        SleepWait() {
+        }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public boolean waitUntil(long deadline) {
             long sleepTimeNanos = deadline - System.nanoTime();
