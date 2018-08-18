@@ -5,6 +5,8 @@ import spock.lang.Unroll
 
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class HashedWheelTimerTest extends Specification {
 
@@ -15,7 +17,7 @@ class HashedWheelTimerTest extends Specification {
      * @param waitStrategy The strategy employed for waiting to advance the cursor
      * @return The timer
      */
-    def oneShotTimer(Duration resolution, int wheelSize, WaitStrategy waitStrategy) {
+    def timer(Duration resolution, int wheelSize, WaitStrategy waitStrategy) {
         def timer = HashedWheelTimer.builder()
                 .withDefaultTimerName()
                 .withDefaultExecutor()
@@ -28,7 +30,7 @@ class HashedWheelTimerTest extends Specification {
     }
 
     def units(TimeUnit unit) {
-        switch(unit) {
+        switch (unit) {
             case TimeUnit.NANOSECONDS: return "ns"
             case TimeUnit.MICROSECONDS: return "µs"
             case TimeUnit.MILLISECONDS: return "ms"
@@ -43,7 +45,7 @@ class HashedWheelTimerTest extends Specification {
 
     def "should be able to schedule a one-shot task"() {
         setup: "create, start, and prime the timer"
-        def timer = oneShotTimer(Duration.ofMillis(1), 512, WaitStrategies.busySpinWait()).start()
+        def timer = timer(Duration.ofMillis(1), 512, WaitStrategies.busySpinWait()).start()
 
         def delay = 10
         def units = TimeUnit.MILLISECONDS
@@ -71,7 +73,7 @@ class HashedWheelTimerTest extends Specification {
     "one-shot task with delay of #delay and resolution #resolution should accurate within #accuracy"() {
         setup: "create, start, and prime the timer"
         def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
-        def timer = oneShotTimer(timerResolution, WheelSize, WaitStrategies.busySpinWait()).start()
+        def timer = timer(timerResolution, WheelSize, WaitStrategies.busySpinWait()).start()
 
         def primeStart = System.nanoTime()
         println((timer.schedule({ -> System.nanoTime() }, Delay, DelayUnits).get() - primeStart) / 1e6 + " ms")
@@ -120,24 +122,17 @@ class HashedWheelTimerTest extends Specification {
     "one-shot task with delay of #delay and resolution #resolution should have most runs within #accuracy"() {
         setup: "create, start, and prime the timer"
         def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
-        def timer = oneShotTimer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
+        def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
 
         def expectedDelayNanos = TimeUnit.NANOSECONDS.convert(Delay, DelayUnits)
-//        List<TestResult> results = (1..Runs).collect({run ->
-//            def start = System.nanoTime()
-//            def executedTime = timer.schedule({ -> System.nanoTime() }, Delay, DelayUnits).get()
-//            def actual = executedTime - start
-//            return new TestResult(actual, actual - expectedDelayNanos)
-//        })
-        List<TestResult> results = []
-        for(int i = 0; i < Runs; ++i) {
+        List<TestResult> results = (1..Runs).collect({ run ->
+            sleep 10
             def start = System.nanoTime()
             def executedTime = timer.schedule({ -> System.nanoTime() }, Delay, DelayUnits).get()
             def actual = executedTime - start
-            results << new TestResult(actual, actual - expectedDelayNanos)
-            sleep 10
-        }
-        def badRuns = results.count {result -> Math.abs(result.error / expectedDelayNanos - 1) > Accuracy}
+            return new TestResult(actual, actual - expectedDelayNanos)
+        })
+        def badRuns = results.count { result -> Math.abs(result.error / expectedDelayNanos - 1) > Accuracy }
 
 
         expect: "the error should be within 15 percent (i.e. 1.5 ms)"
@@ -149,9 +144,9 @@ class HashedWheelTimerTest extends Specification {
 
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Runs
-        100        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 2.0 | 1000
-        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 1.0 | 1000
-        1          | TimeUnit.MILLISECONDS | 10    | TimeUnit.MILLISECONDS | 512       | 1.0 | 100
+        100        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 2.0      | 1000
+        200        | TimeUnit.MICROSECONDS | 1     | TimeUnit.MILLISECONDS | 512       | 1.0      | 1000
+        1          | TimeUnit.MILLISECONDS | 10    | TimeUnit.MILLISECONDS | 512       | 1.0      | 100
 
         resolution = "${Resolution} ${units(ResolutionUnits)}"
         delay = "${Delay} ${units(DelayUnits)}"
@@ -161,9 +156,35 @@ class HashedWheelTimerTest extends Specification {
     class TestResult {
         long actual
         long error
+
         TestResult(actual, error) {
             this.actual = actual
             this.error = error
         }
+    }
+
+    @Unroll
+    "fixed delay timer"() {
+        setup:
+        def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
+        def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
+
+        def executionTimes = new ArrayList(10_000)
+        def start = new AtomicLong(System.nanoTime())
+        timer.scheduleWithFixedDelay({ ->
+            final long execTime = System.nanoTime()
+            final long oldStart = start.getAndSet(execTime)
+            executionTimes.add(execTime - oldStart)
+//            println(String.format("%,4d) %,10d µs", executionTimes.size(), TimeUnit.MICROSECONDS.convert(execTime - oldStart, TimeUnit.NANOSECONDS)))
+//            println(String.format("%,10d µs", TimeUnit.MICROSECONDS.convert(execTime - oldStart, TimeUnit.NANOSECONDS)))
+            return executionTimes
+        }, Timeout, TimeoutUnits, Delay, Delay, DelayUnits).get()
+
+//        sleep TimeoutUnits.MILLISECONDS.convert(2 * Timeout, TimeoutUnits)
+        println(executionTimes)
+
+        where:
+        Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
+        500        | TimeUnit.MICROSECONDS | 50   | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
     }
 }

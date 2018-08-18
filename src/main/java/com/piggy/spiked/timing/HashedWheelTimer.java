@@ -3,7 +3,6 @@ package com.piggy.spiked.timing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Time;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
@@ -600,12 +599,15 @@ public class HashedWheelTimer {
      * delay.
      *
      * @param registration The registration to reschedule
-     * @return The updated registration
+//     * @return The updated registration
      */
-    private ScheduledTask<?> reschedule(final ScheduledTask<?> registration) {
+    private void reschedule(final ScheduledTask<?> registration) {
         wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
-        return registration;
     }
+//    private ScheduledTask<?> reschedule(final ScheduledTask<?> registration) {
+//        wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
+//        return registration;
+//    }
 //    private PeriodicRegistration<?> reschedule(final PeriodicRegistration<?> registration) {
 //        registration.reset();
 //        wheel.get(wheelIndex(cursor.get() + registration.getOffset() + 1)).add(registration);
