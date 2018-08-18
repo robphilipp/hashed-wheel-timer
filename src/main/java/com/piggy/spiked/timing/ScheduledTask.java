@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -68,6 +69,7 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
         taskCompleteExecutor.schedule(() -> {
             complete(null);
             taskCompleteExecutor.shutdown();
+            cancel(true);
         }, timeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 
@@ -123,7 +125,7 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
      */
     ScheduledTask<T> process() {
         // return null for cancelled tasks
-        if(isCancelled()) {
+        if(isCancelled() || isDone()) {
             return null;
         }
 

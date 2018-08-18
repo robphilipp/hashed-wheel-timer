@@ -169,22 +169,21 @@ class HashedWheelTimerTest extends Specification {
         def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
         def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
 
-        def executionTimes = new ArrayList(10_000)
+        List<Long> executionTimes = new ArrayList(10_000)
         def start = new AtomicLong(System.nanoTime())
         timer.scheduleWithFixedDelay({ ->
             final long execTime = System.nanoTime()
             final long oldStart = start.getAndSet(execTime)
             executionTimes.add(execTime - oldStart)
-//            println(String.format("%,4d) %,10d µs", executionTimes.size(), TimeUnit.MICROSECONDS.convert(execTime - oldStart, TimeUnit.NANOSECONDS)))
-//            println(String.format("%,10d µs", TimeUnit.MICROSECONDS.convert(execTime - oldStart, TimeUnit.NANOSECONDS)))
             return executionTimes
         }, Timeout, TimeoutUnits, Delay, Delay, DelayUnits).get()
 
-//        sleep TimeoutUnits.MILLISECONDS.convert(2 * Timeout, TimeoutUnits)
-        println(executionTimes)
+        executionTimes.eachWithIndex { t, index -> println(
+                String.format("%,4d) %,10d %s", index, DelayUnits.convert(t, TimeUnit.NANOSECONDS), units(DelayUnits))
+        ) }
 
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
-        500        | TimeUnit.MICROSECONDS | 50   | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
     }
 }
