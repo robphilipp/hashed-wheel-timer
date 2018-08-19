@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -139,15 +138,17 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
 
                 case FIXED_DELAY:
                     // wait for the task to complete, and then proceed to the fix-rate logic
-                    executorService.submit(task::get);
+//                    executorService.submit(task::get);
+                    task.get();
                     remainingTimesAround.set(periodicTimesAround);
                     rescheduling.accept(this);
                     return null;
 
                 case FIXED_RATE:
+                    executorService.submit(task::get);
                     remainingTimesAround.set(periodicTimesAround);
                     rescheduling.accept(this);
-                    return this;
+                    return null;
             }
         }
 
@@ -264,6 +265,7 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
          * is submitted for execution after a delay after previous the task has completed.
          *
          * @param task        The task to be executed.
+         * @param scheduleType The type of schedule ({@link ScheduleType#FIXED_DELAY} or {@link ScheduleType#FIXED_RATE})
          * @param timesAround The number of times around the timer the cursor needs to move before executing the
          *                    period task, after the initial delay.
          * @param wheelOffset The offset in the wheel, from the current cursor, for the bucket that holds the
@@ -271,33 +273,37 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
          * @param timeout     The time-out for waiting for the task to finish executing
          * @return A reference to this builder for chaining
          */
-        public Builder<T> withFixedDelay(final Supplier<T> task, final int timesAround, final int wheelOffset, final Duration timeout) {
+        public Builder<T> withPeriodic(final Supplier<T> task,
+                                       final ScheduleType scheduleType,
+                                       final int timesAround,
+                                       final int wheelOffset,
+                                       final Duration timeout) {
             this.task = task;
-            this.scheduleType = FIXED_DELAY;
+            this.scheduleType = scheduleType;
             this.periodicWheelOffset = wheelOffset;
             this.periodicTimesAround = timesAround;
             this.timeout = timeout;
             return this;
         }
 
-        /**
-         * Sets the task for a periodic schedule (i.e. executed periodically after the initial delay). The task
-         * is submitted for execution after a delay after immediately after the previous task was submitted.
-         *
-         * @param task        The task to be executed.
-         * @param timesAround The number of times around the timer the cursor needs to move before executing the
-         *                    period task, after the initial delay.
-         * @param wheelOffset The offset in the wheel, from the current cursor, for the bucket that holds the
-         *                    periodic task, after the initial delay.
-         * @return A reference to this builder for chaining
-         */
-        public Builder<T> withFixedRate(final Supplier<T> task, final int timesAround, final int wheelOffset) {
-            this.task = task;
-            this.scheduleType = FIXED_RATE;
-            this.periodicWheelOffset = wheelOffset;
-            this.periodicTimesAround = timesAround;
-            return this;
-        }
+//        /**
+//         * Sets the task for a periodic schedule (i.e. executed periodically after the initial delay). The task
+//         * is submitted for execution after a delay after immediately after the previous task was submitted.
+//         *
+//         * @param task        The task to be executed.
+//         * @param timesAround The number of times around the timer the cursor needs to move before executing the
+//         *                    period task, after the initial delay.
+//         * @param wheelOffset The offset in the wheel, from the current cursor, for the bucket that holds the
+//         *                    periodic task, after the initial delay.
+//         * @return A reference to this builder for chaining
+//         */
+//        public Builder<T> withFixedRate(final Supplier<T> task, final int timesAround, final int wheelOffse, final Duration timeoutt) {
+//            this.task = task;
+//            this.scheduleType = FIXED_DELAY;
+//            this.periodicWheelOffset = wheelOffset;
+//            this.periodicTimesAround = timesAround;
+//            return this;
+//        }
 
         /**
          * @return A validated {@link ScheduledTask} instance

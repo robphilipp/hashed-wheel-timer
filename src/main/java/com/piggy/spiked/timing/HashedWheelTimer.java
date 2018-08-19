@@ -230,20 +230,39 @@ public class HashedWheelTimer {
         return scheduleOneShot(TimeUnit.NANOSECONDS.convert(delay, timeUnit), task);
     }
 
-//    @Override
-//    public ScheduledFuture<?> scheduleAtFixedRate(Runnable runnable, long initialDelay, long period, TimeUnit unit) {
-//        return scheduleFixedRate(TimeUnit.NANOSECONDS.convert(period, unit),
-//                TimeUnit.NANOSECONDS.convert(initialDelay, unit),
-//                constantlyNull(runnable));
-//    }
-//
+    /**
+     * Schedules the task at a fixed rate (i.e. doesn't wait for the task to complete). Will attempt to
+     * run the tasks periodically with the specified period.
+     * @param task The task to be executed
+     * @param timeout The duration of the timer
+     * @param timeoutUnits The units of the timer duration
+     * @param initialDelay The initial delay
+     * @param period The periodic delay
+     * @param unit The time unit associated with the delay and the period
+     * @param <V> The return type of the task
+     * @return The future holding for the task
+     */
+    public <V> CompletableFuture<V> scheduleAtFixedRate(final Supplier<V> task,
+                                                        final long timeout,
+                                                        final TimeUnit timeoutUnits,
+                                                        final long initialDelay,
+                                                        final long period,
+                                                        final TimeUnit unit) {
+        return schedulePeriodic(
+                ScheduleType.FIXED_RATE,
+                TimeUnit.NANOSECONDS.convert(initialDelay, unit),
+                TimeUnit.NANOSECONDS.convert(period, unit),
+                Duration.ofNanos(TimeUnit.NANOSECONDS.convert(timeout, timeoutUnits)),
+                task
+        );
+    }
 
     /**
      * Schedule a task executed after an initial delay and then repeatedly with a delay of {@code period}
      * after the tasks has completed execution.
      * @param task The task to be executed
      * @param timeout The duration of the timer
-     * @param timeoutUnits The units of the tiner duration
+     * @param timeoutUnits The units of the timer duration
      * @param initialDelay The initial delay
      * @param period The periodic delay
      * @param unit The time unit associated with the delay and the period
@@ -256,7 +275,8 @@ public class HashedWheelTimer {
                                                            final long initialDelay,
                                                            final long period,
                                                            final TimeUnit unit) {
-        return scheduleFixedDelay(
+        return schedulePeriodic(
+                ScheduleType.FIXED_DELAY,
                 TimeUnit.NANOSECONDS.convert(initialDelay, unit),
                 TimeUnit.NANOSECONDS.convert(period, unit),
                 Duration.ofNanos(TimeUnit.NANOSECONDS.convert(timeout, timeoutUnits)),
@@ -264,38 +284,6 @@ public class HashedWheelTimer {
         );
     }
 
-//    @Override
-//    public <T> Future<T> submit(Callable<T> task) {
-//        return this.executor.submit(task);
-//    }
-//
-//    @Override
-//    public <T> Future<T> submit(Runnable task, T result) {
-//        return this.executor.submit(task, result);
-//    }
-//
-//    @Override
-//    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-//        return this.executor.invokeAll(tasks);
-//    }
-//
-//    @Override
-//    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout,
-//                                         TimeUnit unit) throws InterruptedException {
-//        return this.executor.invokeAll(tasks, timeout, unit);
-//    }
-//
-//    @Override
-//    public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-//        return this.executor.invokeAny(tasks);
-//    }
-//
-//    @Override
-//    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout,
-//                           TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-//        return this.executor.invokeAny(tasks, timeout, unit);
-//    }
-//
 //    /**
 //     * Create a wrapper Function, which will "debounce" i.e. postpone the function execution until after <code>period</code>
 //     * has elapsed since last time it was invoked. <code>delegate</code> will be called most once <code>period</code>.
@@ -502,7 +490,6 @@ public class HashedWheelTimer {
 
         // add the registration to the bucket the will be processed next. the cursor is always set to the
         // bucket the will be processed next.
-//        System.out.println(String.format("instantiation time: %,d ns", instantiationTime));
         lock.lock();
         wheel.computeIfPresent(wheelIndex(cursor.get() + adjustedOffset), (index, registrations) -> {
             registrations.add(scheduledTask);
@@ -542,10 +529,11 @@ public class HashedWheelTimer {
      * @param <V> The return type of the task
      * @return The completable future with the result.
      */
-    private <V> CompletableFuture<V> scheduleFixedDelay(final long firstDelay,
-                                                        final long periodicDelay,
-                                                        final Duration timeout,
-                                                        final Supplier<V> task) {
+    private <V> CompletableFuture<V> schedulePeriodic(final ScheduleType scheduleType,
+                                                      final long firstDelay,
+                                                      final long periodicDelay,
+                                                      final Duration timeout,
+                                                      final Supplier<V> task) {
         // grab the start time so that we can correct the delay for the amount of time it took to
         // instantiate the scheduled tasks
         final long start = System.nanoTime();
@@ -566,8 +554,7 @@ public class HashedWheelTimer {
                 .withInitialDelayInfo(firstFireRounds, firstFireOffset)
                 .withRescheduling(this::reschedule)
                 .withExecutor(executor)
-//                .withFixedDelay(task, periodicTimeAround, periodicFireOffset, Duration.ofNanos(Math.max(firstDelay, periodicDelay)))
-                .withFixedDelay(task, periodicTimeAround, periodicFireOffset, timeout)
+                .withPeriodic(task, scheduleType, periodicTimeAround, periodicFireOffset, timeout)
                 .build();
 
         final long instantiationTime = System.nanoTime() - start;
@@ -582,7 +569,6 @@ public class HashedWheelTimer {
         // add the registration to the bucket the will be processed next. the cursor is always set to the
         // bucket the will be processed next. note that when the wheel is set up, a concurrent skip list is
         // added to each bucket, and so the an index will always be present
-//        System.out.println(String.format("instantiation time: %,d ns", instantiationTime));
         lock.lock();
         wheel.computeIfPresent(
                 wheelIndex(cursor.get() + adjustedOffset),
@@ -599,20 +585,10 @@ public class HashedWheelTimer {
      * delay.
      *
      * @param registration The registration to reschedule
-//     * @return The updated registration
      */
     private void reschedule(final ScheduledTask<?> registration) {
         wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
     }
-//    private ScheduledTask<?> reschedule(final ScheduledTask<?> registration) {
-//        wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
-//        return registration;
-//    }
-//    private PeriodicRegistration<?> reschedule(final PeriodicRegistration<?> registration) {
-//        registration.reset();
-//        wheel.get(wheelIndex(cursor.get() + registration.getOffset() + 1)).add(registration);
-//        return registration;
-//    }
 
 //    private void assertRunning() {
 //        if (loop.isTerminated()) {
@@ -739,6 +715,16 @@ public class HashedWheelTimer {
          */
         public Builder withDefaultExecutor() {
             this.executor = Executors.newFixedThreadPool(1);
+            return this;
+        }
+
+        /**
+         * Sets the default executor ({@link Executors#newFixedThreadPool(int)}) with one thread.
+         * @param numThreads The number of threads for the executor
+         * @return a reference to this builder for chaining
+         */
+        public Builder withDefaultExecutor(final int numThreads) {
+            this.executor = Executors.newFixedThreadPool(numThreads);
             return this;
         }
 

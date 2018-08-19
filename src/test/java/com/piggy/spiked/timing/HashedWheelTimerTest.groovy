@@ -5,7 +5,6 @@ import spock.lang.Unroll
 
 import java.time.Duration
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 class HashedWheelTimerTest extends Specification {
@@ -17,10 +16,10 @@ class HashedWheelTimerTest extends Specification {
      * @param waitStrategy The strategy employed for waiting to advance the cursor
      * @return The timer
      */
-    def timer(Duration resolution, int wheelSize, WaitStrategy waitStrategy) {
+    def timer(Duration resolution, int wheelSize, WaitStrategy waitStrategy, int executorThreads = 1) {
         def timer = HashedWheelTimer.builder()
                 .withDefaultTimerName()
-                .withDefaultExecutor()
+                .withDefaultExecutor(executorThreads)
                 .withResolution(resolution.toNanos(), TimeUnit.NANOSECONDS)
                 .withWheelSize(wheelSize)
                 .withWaitStrategy(waitStrategy)
@@ -164,7 +163,7 @@ class HashedWheelTimerTest extends Specification {
     }
 
     @Unroll
-    "fixed delay timer"() {
+    "fixed delay timer with resolution #resolution"() {
         setup:
         def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
         def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
@@ -172,18 +171,54 @@ class HashedWheelTimerTest extends Specification {
         List<Long> executionTimes = new ArrayList(10_000)
         def start = new AtomicLong(System.nanoTime())
         timer.scheduleWithFixedDelay({ ->
+//            sleep 10
             final long execTime = System.nanoTime()
             final long oldStart = start.getAndSet(execTime)
             executionTimes.add(execTime - oldStart)
             return executionTimes
         }, Timeout, TimeoutUnits, Delay, Delay, DelayUnits).get()
 
-        executionTimes.eachWithIndex { t, index -> println(
-                String.format("%,4d) %,10d %s", index, DelayUnits.convert(t, TimeUnit.NANOSECONDS), units(DelayUnits))
-        ) }
+        executionTimes.eachWithIndex { t, index ->
+            println(
+                    String.format("%,4d) %,10d %s", index, DelayUnits.convert(t, TimeUnit.NANOSECONDS), units(DelayUnits))
+            )
+        }
 
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
         200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+        200        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 2.0      | 10      | TimeUnit.MILLISECONDS
+
+        resolution = "${Resolution} ${units(ResolutionUnits)}"
+    }
+
+    @Unroll
+    "fixed rate timer with resolution #resolution"() {
+        setup:
+        def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
+        def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
+
+        List<Long> executionTimes = new ArrayList(10_000)
+        def start = new AtomicLong(System.nanoTime())
+        timer.scheduleAtFixedRate({ ->
+//            sleep 10
+            final long execTime = System.nanoTime()
+            final long oldStart = start.getAndSet(execTime)
+            executionTimes.add(execTime - oldStart)
+            return executionTimes
+        }, Timeout, TimeoutUnits, Delay, Delay, DelayUnits).get()
+
+        executionTimes.eachWithIndex { t, index ->
+            println(
+                    String.format("%,4d) %,10d %s", index, DelayUnits.convert(t, TimeUnit.NANOSECONDS), units(DelayUnits))
+            )
+        }
+
+        where:
+        Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
+        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+        200        | TimeUnit.MICROSECONDS | 1000   | TimeUnit.MICROSECONDS | 512       | 2.0      | 100      | TimeUnit.MILLISECONDS
+
+        resolution = "${Resolution} ${units(ResolutionUnits)}"
     }
 }
