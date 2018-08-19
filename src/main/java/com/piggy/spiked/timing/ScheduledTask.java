@@ -138,13 +138,12 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
 
                 case FIXED_DELAY:
                     // wait for the task to complete, and then proceed to the fix-rate logic
-//                    executorService.submit(task::get);
                     task.get();
                     remainingTimesAround.set(periodicTimesAround);
                     rescheduling.accept(this);
                     return null;
 
-                case FIXED_RATE:
+                case FIXED_RATE: // approx. 40 to 60 µs on average
                     executorService.submit(task::get);
                     remainingTimesAround.set(periodicTimesAround);
                     rescheduling.accept(this);

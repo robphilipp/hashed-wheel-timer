@@ -8,11 +8,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
@@ -202,7 +199,7 @@ public class HashedWheelTimer {
                     // 2. the task if rescheduled
                     // All the tasks that are set to null (i.e. cancelled or one-shot) are removed from
                     // the list.
-                    scheduledTasks.removeIf(task -> Objects.isNull(task.process()));
+                    scheduledTasks.removeIf(task -> Objects.isNull(task.process()));  // < 1 µs with no tasks, approx. 40 to 80 µs with tasks
                     return scheduledTasks;
                 });
                 lock.unlock();
@@ -335,58 +332,58 @@ public class HashedWheelTimer {
 //            }
 //        };
 //    }
-
-    /**
-     * Create a wrapper Runnable, which creates a throttled version, which, when called repeatedly, will call the
-     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
-     * in terms of it's "left bound" (first time it's called within the current period).
-     *
-     * @param delegate delegate runnable to be called
-     * @param period   period to be elapsed between the runs
-     * @param timeUnit unit of the period
-     * @return wrapped runnable
-     */
-    public Runnable throttle(final Runnable delegate, final long period, final TimeUnit timeUnit) {
-        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
-
-        return () -> {
-            if (alreadyWaiting.compareAndSet(false, true)) {
-                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
-                        () -> {
-                            delegate.run();
-                            alreadyWaiting.compareAndSet(true, false);
-                            return null;
-                        });
-            }
-        };
-    }
-
-    /**
-     * Create a wrapper Consumer, which creates a throttled version, which, when called repeatedly, will call the
-     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
-     * in terms of it's "left bound" (first time it's called within the current period).
-     *
-     * @param delegate delegate consumer to be called
-     * @param period   period to be elapsed between the runs
-     * @param timeUnit unit of the period
-     * @return wrapped runnable
-     */
-    public <T> Consumer<T> throttle(final Consumer<T> delegate, final long period, final TimeUnit timeUnit) {
-        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
-        final AtomicReference<T> lastValue = new AtomicReference<>();
-
-        return val -> {
-            lastValue.set(val);
-            if (alreadyWaiting.compareAndSet(false, true)) {
-                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
-                        () -> {
-                            delegate.accept(lastValue.getAndSet(null));
-                            alreadyWaiting.compareAndSet(true, false);
-                            return null;
-                        });
-            }
-        };
-    }
+//
+//    /**
+//     * Create a wrapper Runnable, which creates a throttled version, which, when called repeatedly, will call the
+//     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
+//     * in terms of it's "left bound" (first time it's called within the current period).
+//     *
+//     * @param delegate delegate runnable to be called
+//     * @param period   period to be elapsed between the runs
+//     * @param timeUnit unit of the period
+//     * @return wrapped runnable
+//     */
+//    public Runnable throttle(final Runnable delegate, final long period, final TimeUnit timeUnit) {
+//        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
+//
+//        return () -> {
+//            if (alreadyWaiting.compareAndSet(false, true)) {
+//                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
+//                        () -> {
+//                            delegate.run();
+//                            alreadyWaiting.compareAndSet(true, false);
+//                            return null;
+//                        });
+//            }
+//        };
+//    }
+//
+//    /**
+//     * Create a wrapper Consumer, which creates a throttled version, which, when called repeatedly, will call the
+//     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
+//     * in terms of it's "left bound" (first time it's called within the current period).
+//     *
+//     * @param delegate delegate consumer to be called
+//     * @param period   period to be elapsed between the runs
+//     * @param timeUnit unit of the period
+//     * @return wrapped runnable
+//     */
+//    public <T> Consumer<T> throttle(final Consumer<T> delegate, final long period, final TimeUnit timeUnit) {
+//        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
+//        final AtomicReference<T> lastValue = new AtomicReference<>();
+//
+//        return val -> {
+//            lastValue.set(val);
+//            if (alreadyWaiting.compareAndSet(false, true)) {
+//                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
+//                        () -> {
+//                            delegate.accept(lastValue.getAndSet(null));
+//                            alreadyWaiting.compareAndSet(true, false);
+//                            return null;
+//                        });
+//            }
+//        };
+//    }
 
     /**
      * {@inheritDoc}
@@ -587,7 +584,9 @@ public class HashedWheelTimer {
      * @param registration The registration to reschedule
      */
     private void reschedule(final ScheduledTask<?> registration) {
+        lock.lock();
         wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
+        lock.unlock();
     }
 
 //    private void assertRunning() {
