@@ -199,7 +199,7 @@ class HashedWheelTimerTest extends Specification {
         def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
 //        def timer = timer(timerResolution, WheelSize, WaitStrategies.busySpinWait()).start()
 
-        List<Long> executionTimes = new ArrayList(10_000)
+        def executionTimes = new ArrayList(10_000) as List<Long>
         def start = new AtomicLong(System.nanoTime())
         timer.scheduleAtFixedRate({ ->
 //            sleep 10
@@ -220,8 +220,10 @@ class HashedWheelTimerTest extends Specification {
 
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
-        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
-        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 100     | TimeUnit.MILLISECONDS
+        100        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 2.0      | 100       | TimeUnit.MILLISECONDS
+//        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+//        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+//        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 100     | TimeUnit.MILLISECONDS
 
         resolution = "${Resolution} ${units(ResolutionUnits)}"
     }

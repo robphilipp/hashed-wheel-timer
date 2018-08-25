@@ -556,7 +556,6 @@ public class HashedWheelTimer {
 
         final long instantiationTime = System.nanoTime() - start;
         if (firstDelay - instantiationTime <= 0) {
-            System.out.println(String.format("Completed immediately; instantiation time: %,d ns", instantiationTime));
             return scheduledTask.executeNow();
         }
 

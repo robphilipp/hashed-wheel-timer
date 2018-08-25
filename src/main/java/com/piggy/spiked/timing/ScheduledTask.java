@@ -162,13 +162,20 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
      * @return A reference to this instance
      */
     ScheduledTask<T> executeNow() {
-        executorService.submit(() -> complete(task.get()));
         switch(scheduleType) {
             case ONE_SHOT:
+                executorService.submit(() -> complete(task.get()));
                 return this;
 
             case FIXED_DELAY:
+                // wait for the task to complete, and then proceed to the fix-rate logic
+                task.get();
+                remainingTimesAround.set(periodicTimesAround);
+                rescheduling.accept(this);
+                return this;
+
             case FIXED_RATE:
+                executorService.submit(task::get);
                 remainingTimesAround.set(periodicTimesAround);
                 rescheduling.accept(this);
                 return this;
