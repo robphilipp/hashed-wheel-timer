@@ -390,9 +390,7 @@ public class HashedWheelTimer {
      */
     @Override
     public String toString() {
-        return String.format("HashedWheelTimer { Buffer Size: %d, Resolution: %d }",
-                wheelSize,
-                resolution);
+        return String.format("HashedWheelTimer { Buffer Size: %d, Resolution: %d }", wheelSize, resolution);
     }
 
     /**
@@ -496,26 +494,6 @@ public class HashedWheelTimer {
         return scheduledTask;
     }
 
-//    private <V> Registration<V> scheduleFixedRate(long recurringTimeout,
-//                                                  long firstDelay,
-//                                                  Callable<V> callable) {
-//        assertRunning();
-//        isTrue(recurringTimeout >= resolution,
-//                "Cannot schedule tasks for amount of time less than timer precision.");
-//
-//        int offset = (int) (recurringTimeout / resolution);
-//        int rounds = offset / wheelSize;
-//
-//        int firstFireOffset = (int) (firstDelay / resolution);
-//        int firstFireRounds = firstFireOffset / wheelSize;
-//
-//        Registration<V> r = new FixedRateRegistration<>(firstFireRounds, callable, recurringTimeout, rounds, offset);
-////        wheel[wheelIndex(cursor + firstFireOffset + 1)].add(r);
-//        wheel.get(wheelIndex(cursor.get() + firstFireOffset + 1)).add(r);
-//        return r;
-//    }
-//
-
     /**
      * Schedules the specified task to be executed after an initial delay, then periodically, after the
      * task has completed, at specified periodic delay.
@@ -589,25 +567,6 @@ public class HashedWheelTimer {
         wheel.get(wheelIndex(cursor.get() + adjustedOffset)).add(registration);
         lock.unlock();
     }
-
-//    private void assertRunning() {
-//        if (loop.isTerminated()) {
-//            throw new IllegalStateException("Timer is not running");
-//        }
-//    }
-
-//    private static void isTrue(boolean expression, String message) {
-//        if (!expression) {
-//            throw new IllegalArgumentException(message);
-//        }
-//    }
-
-//    private static Callable<?> constantlyNull(Runnable r) {
-//        return () -> {
-//            r.run();
-//            return null;
-//        };
-//    }
 
     /**
      * Builder for constructing validated {@link HashedWheelTimer} instances
