@@ -68,6 +68,28 @@ class HashedWheelTimerTest extends Specification {
         timer.shutdown()
     }
 
+    def "should be able to schedule a one-shot task with a sleep wait strategy"() {
+        setup: "create, start, and prime the timer"
+        def timer = timer(Duration.ofMillis(10), 512, WaitStrategies.sleepWait()).start()
+
+        def delay = 1000
+        def units = TimeUnit.MILLISECONDS
+
+        when: "we schedule a task with a 10 ms delay"
+        def start = System.nanoTime()
+        def executedTime = timer.schedule({ -> System.nanoTime() }, delay, TimeUnit.MILLISECONDS).get()
+
+        and: "and calculate the actual delay"
+        def actualDelay = executedTime - start
+
+        then: "the error should be within 15 percent (i.e. 1.5 ms)"
+        def expectedDelayNanos = TimeUnit.NANOSECONDS.convert(delay, units)
+        Math.abs(actualDelay - expectedDelayNanos) / expectedDelayNanos <= 0.15
+
+        cleanup: "shutdown the timer"
+        timer.shutdown()
+    }
+
     @Unroll
     "one-shot task with delay of #delay and resolution #resolution should accurate within #accuracy"() {
         setup: "create, start, and prime the timer"
@@ -162,16 +184,98 @@ class HashedWheelTimerTest extends Specification {
         }
     }
 
+    def "should be able to schedule a one-shot task and then shutdown the timer immediately"() {
+        setup: "create, start, and prime the timer"
+        def timerResolution = Duration.ofSeconds(1)
+        def timer = timer(timerResolution, 512, WaitStrategies.yieldingWait()).start()
+
+        def delay = 100
+        def units = TimeUnit.SECONDS
+
+        when: "we schedule a task with a 10 ms delay"
+        timer.schedule({ -> System.nanoTime() }, delay, units)
+
+        and: "we sleep for 500 ms"
+        sleep 500
+
+        then: "the time should be running"
+        !timer.isShutdown()
+        !timer.isTerminated()
+
+        when: "we shutdown immediately, then the scheduled job is cancelled"
+        timer.shutdownNow()
+
+        then:
+        timer.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+    }
+
+    def "should be able to schedule a one-shot task and then have the timer-shutdown wait until the task is done"() {
+        setup: "create, start, and prime the timer"
+        def timerResolution = Duration.ofMillis(100)
+        def timer = timer(timerResolution, 512, WaitStrategies.yieldingWait()).start()
+
+        def delay = 1000
+        def units = TimeUnit.MILLISECONDS
+
+        when: "we schedule a task with a 10 ms delay"
+        timer.schedule({ -> System.nanoTime() }, delay, units)
+
+        then: "the time should be running"
+        !timer.isShutdown()
+        !timer.isTerminated()
+
+        when: "we shutdown immediately, then the scheduled job is cancelled"
+        def start = System.nanoTime()
+        timer.shutdown()
+
+        and:
+        def isShutdown = timer.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+        def shutdownTime = System.nanoTime()
+
+        then:
+        isShutdown
+
+        and:
+        Math.max(0, shutdownTime - start - TimeUnit.NANOSECONDS.convert(delay, units)) <= timerResolution.toNanos()
+    }
+
+    def "should be able to schedule a one-shot task and then cancel it"() {
+        setup: "create, start, and prime the timer"
+        def timerResolution = Duration.ofSeconds(1)
+        def timer = timer(timerResolution, 512, WaitStrategies.yieldingWait()).start()
+
+        def delay = 100
+        def units = TimeUnit.SECONDS
+
+        when: "we schedule a task with a 10 ms delay"
+        def taskFuture = timer.schedule({ -> System.nanoTime() }, delay, units)
+
+        and: "we sleep for 500 ms"
+        sleep 500
+
+        then: "we should be able to cancel the task"
+        def start = System.currentTimeMillis()
+        taskFuture.cancel(true)
+
+        and: "the task should be cancelled"
+        taskFuture.isCancelled()
+
+        and:
+        System.currentTimeMillis() - start <= 1000
+
+        cleanup: "we shutdown immediately, then the scheduled job is cancelled"
+        timer.shutdown()
+    }
+
     @Unroll
     "fixed delay timer with resolution #resolution"() {
         setup:
         def timerResolution = Duration.ofNanos(TimeUnit.NANOSECONDS.convert(Resolution, ResolutionUnits))
         def timer = timer(timerResolution, WheelSize, WaitStrategies.yieldingWait()).start()
 
-        List<Long> executionTimes = new ArrayList(10_000)
+        def executionTimes = new ArrayList(10_000) as List<Long>
         def start = new AtomicLong(System.nanoTime())
         timer.scheduleWithFixedDelay({ ->
-//            sleep 10
             final long execTime = System.nanoTime()
             final long oldStart = start.getAndSet(execTime)
             executionTimes.add(execTime - oldStart)
@@ -202,7 +306,6 @@ class HashedWheelTimerTest extends Specification {
         def executionTimes = new ArrayList(10_000) as List<Long>
         def start = new AtomicLong(System.nanoTime())
         timer.scheduleAtFixedRate({ ->
-//            sleep 10
             final long execTime = System.nanoTime()
             final long oldStart = start.getAndSet(execTime)
             executionTimes.add(execTime - oldStart)
@@ -221,9 +324,9 @@ class HashedWheelTimerTest extends Specification {
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
         200        | TimeUnit.MICROSECONDS | 1000   | TimeUnit.MICROSECONDS | 512       | 2.0      | 100       | TimeUnit.MILLISECONDS
-//        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
-//        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
-//        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 100     | TimeUnit.MILLISECONDS
+        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
+        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 100     | TimeUnit.MILLISECONDS
 
         resolution = "${Resolution} ${units(ResolutionUnits)}"
     }

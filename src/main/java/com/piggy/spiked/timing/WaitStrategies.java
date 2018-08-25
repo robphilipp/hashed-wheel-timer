@@ -4,12 +4,19 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
 
-@SuppressWarnings("ALL")
+/**
+ * Factory methods for creating {@link WaitStrategy} instances.
+ * <p>
+ * The wait strategies. Busy-spin and yielding wait seem to have about the same accuracy,
+ * though, busy-spin may be a tad more accurate at short (~200 µs) delay times. Sleep
+ * wait should really only be used for timer-resolutions of 10 ms or greater.
+ * </p>
+ */
 public class WaitStrategies {
 
     /**
      * Returns a new strategy for the corresponding string-literal strategy name
-     * @param strategyLiteral
+     * @param strategyLiteral The wait strategy as a string
      * @return An {@link Optional} holding the {@link WaitStrategy} corresponding to the
      * specified strategy name; or an empty {@link Optional} if the strategy name was
      * invalid.

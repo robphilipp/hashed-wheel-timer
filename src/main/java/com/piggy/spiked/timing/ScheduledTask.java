@@ -8,7 +8,6 @@ import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static com.piggy.spiked.timing.ScheduleType.FIXED_DELAY;
@@ -30,7 +29,6 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
     private final AtomicInteger remainingTimesAround = new AtomicInteger();
     private final Supplier<T> task;
     private final ScheduleType scheduleType;
-//    private final Consumer<ScheduledTask<T>> rescheduling;
     private final BiConsumer<ScheduledTask<T>, Long> rescheduling;
     private final ExecutorService executorService;
 
@@ -54,7 +52,6 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
                           final Duration timeout,
                           final Supplier<T> task,
                           final ScheduleType scheduleType,
-//                          final Consumer<ScheduledTask<T>> rescheduling,
                           final BiConsumer<ScheduledTask<T>, Long> rescheduling,
                           final ExecutorService executorService) {
         this.periodicWheelOffset = periodicWheelOffset;
@@ -67,12 +64,14 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
         this.executorService = executorService;
 
         // set a timer to shut down the periodic tasks
-        final ScheduledExecutorService taskCompleteExecutor = Executors.newSingleThreadScheduledExecutor();
-        taskCompleteExecutor.schedule(() -> {
-            complete(null);
-            taskCompleteExecutor.shutdown();
-            cancel(true);
-        }, timeout.toMillis(), TimeUnit.MILLISECONDS);
+        if(Objects.nonNull(timeout)) {
+            final ScheduledExecutorService taskCompleteExecutor = Executors.newSingleThreadScheduledExecutor();
+            taskCompleteExecutor.schedule(() -> {
+                complete(null);
+                taskCompleteExecutor.shutdown();
+                cancel(true);
+            }, timeout.toMillis(), TimeUnit.MILLISECONDS);
+        }
     }
 
     /**
@@ -98,27 +97,6 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
     }
 
     /**
-     * @return The task
-     */
-    public Supplier<T> task() {
-        return task;
-    }
-
-    /**
-     * @return The schedule type (i.e. one-shot, fixed-rate, fixed-delay)
-     */
-    public ScheduleType scheduleType() {
-        return scheduleType;
-    }
-
-    /**
-     * @return whether or not the schedule has been cancelled
-     */
-    public boolean notCancelled() {
-        return !isCancelled();
-    }
-
-    /**
      * Process the scheduled tasks. Updates the number of times around, and submits the task for execution
      * if it the cursor has gone around enough times. For periodic tasks, updates the times-around
      * and calls the hashed-while-timer to reschedule the task.
@@ -131,7 +109,6 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
             return null;
         }
 
-        // todo for periodic processing need a scheduled executor to the task that cancels the timer (completes the task)
         // execute tasks that are ready
         if(remainingTimesAround.decrementAndGet() < 0) {
             switch(scheduleType) {
@@ -223,7 +200,6 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
         private Duration timeout;
         private Supplier<T> task;
         private ScheduleType scheduleType;
-//        private Consumer<ScheduledTask<T>> rescheduling;
         private BiConsumer<ScheduledTask<T>, Long> rescheduling;
         private ExecutorService executorService;
 
@@ -300,25 +276,6 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
             this.timeout = timeout;
             return this;
         }
-
-//        /**
-//         * Sets the task for a periodic schedule (i.e. executed periodically after the initial delay). The task
-//         * is submitted for execution after a delay after immediately after the previous task was submitted.
-//         *
-//         * @param task        The task to be executed.
-//         * @param timesAround The number of times around the timer the cursor needs to move before executing the
-//         *                    period task, after the initial delay.
-//         * @param wheelOffset The offset in the wheel, from the current cursor, for the bucket that holds the
-//         *                    periodic task, after the initial delay.
-//         * @return A reference to this builder for chaining
-//         */
-//        public Builder<T> withFixedRate(final Supplier<T> task, final int timesAround, final int wheelOffse, final Duration timeoutt) {
-//            this.task = task;
-//            this.scheduleType = FIXED_DELAY;
-//            this.periodicWheelOffset = wheelOffset;
-//            this.periodicTimesAround = timesAround;
-//            return this;
-//        }
 
         /**
          * @return A validated {@link ScheduledTask} instance

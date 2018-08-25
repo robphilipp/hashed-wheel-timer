@@ -1,5 +1,10 @@
 package com.piggy.spiked.timing;
 
+/**
+ * The wait strategies. Busy-spin and yielding wait seem to have about the same accuracy,
+ * though, busy-spin may be a tad more accurate at short (~200 µs) delay times. Sleep
+ * wait should really only be used for timer-resolutions of 10 ms or greater.
+ */
 public interface WaitStrategy {
 
     /**

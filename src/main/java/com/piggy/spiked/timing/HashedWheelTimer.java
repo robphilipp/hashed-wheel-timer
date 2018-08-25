@@ -40,7 +40,6 @@ import java.util.stream.IntStream;
  *
  * @author Rob Philipp
  */
-@SuppressWarnings("WeakerAccess")
 public class HashedWheelTimer {
     private static final Logger LOGGER = LoggerFactory.getLogger(HashedWheelTimer.class);
 
