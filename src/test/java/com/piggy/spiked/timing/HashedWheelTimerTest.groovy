@@ -3,7 +3,6 @@ package com.piggy.spiked.timing
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import java.sql.Time
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong

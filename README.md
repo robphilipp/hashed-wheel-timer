@@ -5,3 +5,5 @@ higher time-resolution. This timer can get approximately 50 µs to 100 µs times
 
 These updates were done mainly to support signal propagation delays in my spiking neural networks, which need µs 
 resolution, but can tolerate noise in the delay times.
+
+Benchmarks and example code can be found in the [benchmark repository](https://github.com/robphilipp/hashed-wheel-timer-benchmarks).
