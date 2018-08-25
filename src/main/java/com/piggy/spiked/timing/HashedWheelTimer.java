@@ -8,11 +8,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
@@ -43,7 +40,6 @@ import java.util.stream.IntStream;
  *
  * @author Rob Philipp
  */
-@SuppressWarnings("WeakerAccess")
 public class HashedWheelTimer {
     private static final Logger LOGGER = LoggerFactory.getLogger(HashedWheelTimer.class);
 
@@ -192,7 +188,7 @@ public class HashedWheelTimer {
                 final int currentCursor = cursor.getAndUpdate(val -> (val + 1) % wheelSize);
 
                 // update the scheduled tasks
-                wheel.computeIfPresent(currentCursor, (index, scheduledTasks) -> {
+                wheel.computeIfPresent(wheelIndex(currentCursor), (index, scheduledTasks) -> {
                     // update the registration list based on the results of the call to process the task
                     // the task.process does the following:
                     // 1. executes the task if ready
@@ -202,7 +198,7 @@ public class HashedWheelTimer {
                     // 2. the task if rescheduled
                     // All the tasks that are set to null (i.e. cancelled or one-shot) are removed from
                     // the list.
-                    scheduledTasks.removeIf(task -> Objects.isNull(task.process()));
+                    scheduledTasks.removeIf(task -> Objects.isNull(task.process()));  // < 1 µs with no tasks, approx. 40 to 80 µs with tasks
                     return scheduledTasks;
                 });
                 lock.unlock();
@@ -230,18 +226,39 @@ public class HashedWheelTimer {
         return scheduleOneShot(TimeUnit.NANOSECONDS.convert(delay, timeUnit), task);
     }
 
-//    @Override
-//    public ScheduledFuture<?> scheduleAtFixedRate(Runnable runnable, long initialDelay, long period, TimeUnit unit) {
-//        return scheduleFixedRate(TimeUnit.NANOSECONDS.convert(period, unit),
-//                TimeUnit.NANOSECONDS.convert(initialDelay, unit),
-//                constantlyNull(runnable));
-//    }
-//
+    /**
+     * Schedules the task at a fixed rate (i.e. doesn't wait for the task to complete). Will attempt to
+     * run the tasks periodically with the specified period.
+     * @param task The task to be executed
+     * @param timeout The duration of the timer
+     * @param timeoutUnits The units of the timer duration
+     * @param initialDelay The initial delay
+     * @param period The periodic delay
+     * @param unit The time unit associated with the delay and the period
+     * @param <V> The return type of the task
+     * @return The future holding for the task
+     */
+    public <V> CompletableFuture<V> scheduleAtFixedRate(final Supplier<V> task,
+                                                        final long timeout,
+                                                        final TimeUnit timeoutUnits,
+                                                        final long initialDelay,
+                                                        final long period,
+                                                        final TimeUnit unit) {
+        return schedulePeriodic(
+                ScheduleType.FIXED_RATE,
+                TimeUnit.NANOSECONDS.convert(initialDelay, unit),
+                TimeUnit.NANOSECONDS.convert(period, unit),
+                Duration.ofNanos(TimeUnit.NANOSECONDS.convert(timeout, timeoutUnits)),
+                task
+        );
+    }
 
     /**
      * Schedule a task executed after an initial delay and then repeatedly with a delay of {@code period}
      * after the tasks has completed execution.
      * @param task The task to be executed
+     * @param timeout The duration of the timer
+     * @param timeoutUnits The units of the timer duration
      * @param initialDelay The initial delay
      * @param period The periodic delay
      * @param unit The time unit associated with the delay and the period
@@ -249,48 +266,20 @@ public class HashedWheelTimer {
      * @return The future holding for the task
      */
     public <V> CompletableFuture<V> scheduleWithFixedDelay(final Supplier<V> task,
+                                                           final long timeout,
+                                                           final TimeUnit timeoutUnits,
                                                            final long initialDelay,
                                                            final long period,
                                                            final TimeUnit unit) {
-        return scheduleFixedDelay(
+        return schedulePeriodic(
+                ScheduleType.FIXED_DELAY,
                 TimeUnit.NANOSECONDS.convert(initialDelay, unit),
                 TimeUnit.NANOSECONDS.convert(period, unit),
+                Duration.ofNanos(TimeUnit.NANOSECONDS.convert(timeout, timeoutUnits)),
                 task
         );
     }
 
-//    @Override
-//    public <T> Future<T> submit(Callable<T> task) {
-//        return this.executor.submit(task);
-//    }
-//
-//    @Override
-//    public <T> Future<T> submit(Runnable task, T result) {
-//        return this.executor.submit(task, result);
-//    }
-//
-//    @Override
-//    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException {
-//        return this.executor.invokeAll(tasks);
-//    }
-//
-//    @Override
-//    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout,
-//                                         TimeUnit unit) throws InterruptedException {
-//        return this.executor.invokeAll(tasks, timeout, unit);
-//    }
-//
-//    @Override
-//    public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException {
-//        return this.executor.invokeAny(tasks);
-//    }
-//
-//    @Override
-//    public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout,
-//                           TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-//        return this.executor.invokeAny(tasks, timeout, unit);
-//    }
-//
 //    /**
 //     * Create a wrapper Function, which will "debounce" i.e. postpone the function execution until after <code>period</code>
 //     * has elapsed since last time it was invoked. <code>delegate</code> will be called most once <code>period</code>.
@@ -342,67 +331,65 @@ public class HashedWheelTimer {
 //            }
 //        };
 //    }
-
-    /**
-     * Create a wrapper Runnable, which creates a throttled version, which, when called repeatedly, will call the
-     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
-     * in terms of it's "left bound" (first time it's called within the current period).
-     *
-     * @param delegate delegate runnable to be called
-     * @param period   period to be elapsed between the runs
-     * @param timeUnit unit of the period
-     * @return wrapped runnable
-     */
-    public Runnable throttle(final Runnable delegate, final long period, final TimeUnit timeUnit) {
-        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
-
-        return () -> {
-            if (alreadyWaiting.compareAndSet(false, true)) {
-                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
-                        () -> {
-                            delegate.run();
-                            alreadyWaiting.compareAndSet(true, false);
-                            return null;
-                        });
-            }
-        };
-    }
-
-    /**
-     * Create a wrapper Consumer, which creates a throttled version, which, when called repeatedly, will call the
-     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
-     * in terms of it's "left bound" (first time it's called within the current period).
-     *
-     * @param delegate delegate consumer to be called
-     * @param period   period to be elapsed between the runs
-     * @param timeUnit unit of the period
-     * @return wrapped runnable
-     */
-    public <T> Consumer<T> throttle(final Consumer<T> delegate, final long period, final TimeUnit timeUnit) {
-        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
-        final AtomicReference<T> lastValue = new AtomicReference<>();
-
-        return val -> {
-            lastValue.set(val);
-            if (alreadyWaiting.compareAndSet(false, true)) {
-                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
-                        () -> {
-                            delegate.accept(lastValue.getAndSet(null));
-                            alreadyWaiting.compareAndSet(true, false);
-                            return null;
-                        });
-            }
-        };
-    }
+//
+//    /**
+//     * Create a wrapper Runnable, which creates a throttled version, which, when called repeatedly, will call the
+//     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
+//     * in terms of it's "left bound" (first time it's called within the current period).
+//     *
+//     * @param delegate delegate runnable to be called
+//     * @param period   period to be elapsed between the runs
+//     * @param timeUnit unit of the period
+//     * @return wrapped runnable
+//     */
+//    public Runnable throttle(final Runnable delegate, final long period, final TimeUnit timeUnit) {
+//        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
+//
+//        return () -> {
+//            if (alreadyWaiting.compareAndSet(false, true)) {
+//                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
+//                        () -> {
+//                            delegate.run();
+//                            alreadyWaiting.compareAndSet(true, false);
+//                            return null;
+//                        });
+//            }
+//        };
+//    }
+//
+//    /**
+//     * Create a wrapper Consumer, which creates a throttled version, which, when called repeatedly, will call the
+//     * original function only once per every <code>period</code> milliseconds. It's easier to think about throttle
+//     * in terms of it's "left bound" (first time it's called within the current period).
+//     *
+//     * @param delegate delegate consumer to be called
+//     * @param period   period to be elapsed between the runs
+//     * @param timeUnit unit of the period
+//     * @return wrapped runnable
+//     */
+//    public <T> Consumer<T> throttle(final Consumer<T> delegate, final long period, final TimeUnit timeUnit) {
+//        final AtomicBoolean alreadyWaiting = new AtomicBoolean();
+//        final AtomicReference<T> lastValue = new AtomicReference<>();
+//
+//        return val -> {
+//            lastValue.set(val);
+//            if (alreadyWaiting.compareAndSet(false, true)) {
+//                scheduleOneShot(TimeUnit.NANOSECONDS.convert(period, timeUnit),
+//                        () -> {
+//                            delegate.accept(lastValue.getAndSet(null));
+//                            alreadyWaiting.compareAndSet(true, false);
+//                            return null;
+//                        });
+//            }
+//        };
+//    }
 
     /**
      * {@inheritDoc}
      */
     @Override
     public String toString() {
-        return String.format("HashedWheelTimer { Buffer Size: %d, Resolution: %d }",
-                wheelSize,
-                resolution);
+        return String.format("HashedWheelTimer { Buffer Size: %d, Resolution: %d }", wheelSize, resolution);
     }
 
     /**
@@ -497,7 +484,6 @@ public class HashedWheelTimer {
 
         // add the registration to the bucket the will be processed next. the cursor is always set to the
         // bucket the will be processed next.
-//        System.out.println(String.format("instantiation time: %,d ns", instantiationTime));
         lock.lock();
         wheel.computeIfPresent(wheelIndex(cursor.get() + adjustedOffset), (index, registrations) -> {
             registrations.add(scheduledTask);
@@ -507,38 +493,21 @@ public class HashedWheelTimer {
         return scheduledTask;
     }
 
-//    private <V> Registration<V> scheduleFixedRate(long recurringTimeout,
-//                                                  long firstDelay,
-//                                                  Callable<V> callable) {
-//        assertRunning();
-//        isTrue(recurringTimeout >= resolution,
-//                "Cannot schedule tasks for amount of time less than timer precision.");
-//
-//        int offset = (int) (recurringTimeout / resolution);
-//        int rounds = offset / wheelSize;
-//
-//        int firstFireOffset = (int) (firstDelay / resolution);
-//        int firstFireRounds = firstFireOffset / wheelSize;
-//
-//        Registration<V> r = new FixedRateRegistration<>(firstFireRounds, callable, recurringTimeout, rounds, offset);
-////        wheel[wheelIndex(cursor + firstFireOffset + 1)].add(r);
-//        wheel.get(wheelIndex(cursor.get() + firstFireOffset + 1)).add(r);
-//        return r;
-//    }
-//
-
     /**
      * Schedules the specified task to be executed after an initial delay, then periodically, after the
      * task has completed, at specified periodic delay.
      * @param firstDelay The first delay (in nanoseconds) after which to execute the task
      * @param periodicDelay The periodic delay (in nanoseconds) after the task has completed, to execute the task
+     * @param timeout The duration of the periodic timer (time until it stops)
      * @param task The task to execute
      * @param <V> The return type of the task
      * @return The completable future with the result.
      */
-    private <V> CompletableFuture<V> scheduleFixedDelay(final long firstDelay,
-                                                        final long periodicDelay,
-                                                        final Supplier<V> task) {
+    private <V> CompletableFuture<V> schedulePeriodic(final ScheduleType scheduleType,
+                                                      final long firstDelay,
+                                                      final long periodicDelay,
+                                                      final Duration timeout,
+                                                      final Supplier<V> task) {
         // grab the start time so that we can correct the delay for the amount of time it took to
         // instantiate the scheduled tasks
         final long start = System.nanoTime();
@@ -559,12 +528,11 @@ public class HashedWheelTimer {
                 .withInitialDelayInfo(firstFireRounds, firstFireOffset)
                 .withRescheduling(this::reschedule)
                 .withExecutor(executor)
-                .withFixedDelay(task, periodicTimeAround, periodicFireOffset, Duration.ofNanos(Math.max(firstDelay, periodicDelay)))
+                .withPeriodic(task, scheduleType, periodicTimeAround, periodicFireOffset, timeout)
                 .build();
 
         final long instantiationTime = System.nanoTime() - start;
         if (firstDelay - instantiationTime <= 0) {
-            System.out.println(String.format("Completed immediately; instantiation time: %,d ns", instantiationTime));
             return scheduledTask.executeNow();
         }
 
@@ -572,8 +540,8 @@ public class HashedWheelTimer {
         final int adjustedOffset = wheelOffset(firstDelay - instantiationTime);
 
         // add the registration to the bucket the will be processed next. the cursor is always set to the
-        // bucket the will be processed next.
-//        System.out.println(String.format("instantiation time: %,d ns", instantiationTime));
+        // bucket the will be processed next. note that when the wheel is set up, a concurrent skip list is
+        // added to each bucket, and so the an index will always be present
         lock.lock();
         wheel.computeIfPresent(
                 wheelIndex(cursor.get() + adjustedOffset),
@@ -590,36 +558,14 @@ public class HashedWheelTimer {
      * delay.
      *
      * @param registration The registration to reschedule
-     * @return The updated registration
      */
-    private ScheduledTask<?> reschedule(final ScheduledTask<?> registration) {
-        wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
-        return registration;
+    private void reschedule(final ScheduledTask<?> registration, final long start) {
+        lock.lock();
+        final long instantiationTime = System.nanoTime() - start;
+        final int adjustedOffset = Math.max(0, registration.periodicWheelOffset() - wheelOffset(instantiationTime));
+        wheel.get(wheelIndex(cursor.get() + adjustedOffset)).add(registration);
+        lock.unlock();
     }
-//    private PeriodicRegistration<?> reschedule(final PeriodicRegistration<?> registration) {
-//        registration.reset();
-//        wheel.get(wheelIndex(cursor.get() + registration.getOffset() + 1)).add(registration);
-//        return registration;
-//    }
-
-//    private void assertRunning() {
-//        if (loop.isTerminated()) {
-//            throw new IllegalStateException("Timer is not running");
-//        }
-//    }
-
-//    private static void isTrue(boolean expression, String message) {
-//        if (!expression) {
-//            throw new IllegalArgumentException(message);
-//        }
-//    }
-
-//    private static Callable<?> constantlyNull(Runnable r) {
-//        return () -> {
-//            r.run();
-//            return null;
-//        };
-//    }
 
     /**
      * Builder for constructing validated {@link HashedWheelTimer} instances
@@ -731,6 +677,16 @@ public class HashedWheelTimer {
         }
 
         /**
+         * Sets the default executor ({@link Executors#newFixedThreadPool(int)}) with one thread.
+         * @param numThreads The number of threads for the executor
+         * @return a reference to this builder for chaining
+         */
+        public Builder withDefaultExecutor(final int numThreads) {
+            this.executor = Executors.newFixedThreadPool(numThreads);
+            return this;
+        }
+
+        /**
          * @return A validated {@link HashedWheelTimer} instance
          */
         public HashedWheelTimer build() {
@@ -749,7 +705,7 @@ public class HashedWheelTimer {
                 LOGGER.error(message);
                 throw new IllegalStateException(message);
             }
-            if (units.convert(resolution, TimeUnit.MICROSECONDS) < 50) {
+            if (TimeUnit.MICROSECONDS.convert(resolution, units) < 50) {
                 final String message = String.format("Timer resolution must be 50 µs or greater; specified: %d %s", resolution, units.toString());
                 LOGGER.error(message);
                 throw new IllegalStateException(message);
@@ -764,7 +720,8 @@ public class HashedWheelTimer {
                 LOGGER.error(message);
                 throw new IllegalStateException(message);
             }
-            return new HashedWheelTimer(timerName, resolution, wheelSize, waitStrategy, executor);
+            final long resolutionNanos = TimeUnit.NANOSECONDS.convert(resolution, units);
+            return new HashedWheelTimer(timerName, resolutionNanos, wheelSize, waitStrategy, executor);
         }
     }
 }
