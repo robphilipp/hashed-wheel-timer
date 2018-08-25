@@ -582,9 +582,11 @@ public class HashedWheelTimer {
      *
      * @param registration The registration to reschedule
      */
-    private void reschedule(final ScheduledTask<?> registration) {
+    private void reschedule(final ScheduledTask<?> registration, final long start) {
         lock.lock();
-        wheel.get(wheelIndex(cursor.get() + registration.periodicWheelOffset() + 1)).add(registration);
+        final long instantiationTime = System.nanoTime() - start;
+        final int adjustedOffset = Math.max(0, registration.periodicWheelOffset() - wheelOffset(instantiationTime));
+        wheel.get(wheelIndex(cursor.get() + adjustedOffset)).add(registration);
         lock.unlock();
     }
 

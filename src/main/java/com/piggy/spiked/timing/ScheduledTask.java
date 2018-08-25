@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -29,7 +30,8 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
     private final AtomicInteger remainingTimesAround = new AtomicInteger();
     private final Supplier<T> task;
     private final ScheduleType scheduleType;
-    private final Consumer<ScheduledTask<T>> rescheduling;
+//    private final Consumer<ScheduledTask<T>> rescheduling;
+    private final BiConsumer<ScheduledTask<T>, Long> rescheduling;
     private final ExecutorService executorService;
 
     /**
@@ -52,7 +54,8 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
                           final Duration timeout,
                           final Supplier<T> task,
                           final ScheduleType scheduleType,
-                          final Consumer<ScheduledTask<T>> rescheduling,
+//                          final Consumer<ScheduledTask<T>> rescheduling,
+                          final BiConsumer<ScheduledTask<T>, Long> rescheduling,
                           final ExecutorService executorService) {
         this.periodicWheelOffset = periodicWheelOffset;
         this.periodicTimesAround = periodicTimesAround;
@@ -136,18 +139,23 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
                     executorService.submit(() -> complete(task.get()));
                     return null;
 
-                case FIXED_DELAY:
+                case FIXED_DELAY: {
                     // wait for the task to complete, and then proceed to the fix-rate logic
                     task.get();
+                    final long start = System.nanoTime();
                     remainingTimesAround.set(periodicTimesAround);
-                    rescheduling.accept(this);
+                    rescheduling.accept(this, start);
                     return null;
+                }
 
-                case FIXED_RATE: // approx. 40 to 60 µs on average
+                case FIXED_RATE: {
+                    // approx. 40 to 60 µs on average
+                    final long start = System.nanoTime();
                     executorService.submit(task::get);
                     remainingTimesAround.set(periodicTimesAround);
-                    rescheduling.accept(this);
+                    rescheduling.accept(this, start);
                     return null;
+                }
             }
         }
 
@@ -171,13 +179,13 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
                 // wait for the task to complete, and then proceed to the fix-rate logic
                 task.get();
                 remainingTimesAround.set(periodicTimesAround);
-                rescheduling.accept(this);
+                rescheduling.accept(this, System.nanoTime());
                 return this;
 
             case FIXED_RATE:
                 executorService.submit(task::get);
                 remainingTimesAround.set(periodicTimesAround);
-                rescheduling.accept(this);
+                rescheduling.accept(this, System.nanoTime());
                 return this;
         }
         return this;
@@ -215,7 +223,8 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
         private Duration timeout;
         private Supplier<T> task;
         private ScheduleType scheduleType;
-        private Consumer<ScheduledTask<T>> rescheduling;
+//        private Consumer<ScheduledTask<T>> rescheduling;
+        private BiConsumer<ScheduledTask<T>, Long> rescheduling;
         private ExecutorService executorService;
 
         /**
@@ -238,7 +247,7 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
          * @param rescheduling The rescheduling function.
          * @return A reference to this builder for chaining
          */
-        public Builder<T> withRescheduling(final Consumer<ScheduledTask<T>> rescheduling) {
+        public Builder<T> withRescheduling(final BiConsumer<ScheduledTask<T>, Long> rescheduling) {
             this.rescheduling = rescheduling;
             return this;
         }

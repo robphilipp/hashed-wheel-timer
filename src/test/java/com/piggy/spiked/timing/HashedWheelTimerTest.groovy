@@ -220,7 +220,7 @@ class HashedWheelTimerTest extends Specification {
 
         where:
         Resolution | ResolutionUnits       | Delay | DelayUnits            | WheelSize | Accuracy | Timeout | TimeoutUnits
-        100        | TimeUnit.MICROSECONDS | 200   | TimeUnit.MICROSECONDS | 512       | 2.0      | 100       | TimeUnit.MILLISECONDS
+        200        | TimeUnit.MICROSECONDS | 1000   | TimeUnit.MICROSECONDS | 512       | 2.0      | 100       | TimeUnit.MILLISECONDS
 //        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
 //        200        | TimeUnit.MICROSECONDS | 50    | TimeUnit.MILLISECONDS | 512       | 2.0      | 1       | TimeUnit.SECONDS
 //        200        | TimeUnit.MICROSECONDS | 1000  | TimeUnit.MICROSECONDS | 512       | 2.0      | 100     | TimeUnit.MILLISECONDS
