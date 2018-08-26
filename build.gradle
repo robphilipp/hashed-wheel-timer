@@ -43,86 +43,88 @@ artifacts {
     archives javadocJar
 }
 
-signing {
-    sign configurations.archives
-}
+if(hasProperty('sonatypeUsername')) {
+    signing {
+        sign configurations.archives
+    }
 
-publishing {
-    publications {
-        hashedWheelTimer(MavenPublication) {
-            pom {
-                name = 'hashed-wheel-timer'
-                description = 'hashed-wheel-timer with sub-millisecond resolution'
-                url = 'https://github.com/robphilipp/hashed-wheel-timer'
-                licenses {
-                    license {
-                        name = 'Eclipse Public License - v 2.0'
-                        url = 'https://github.com/robphilipp/hashed-wheel-timer/LICENSE'
-                    }
-                }
-                organization {
-                    name = 'com.closure-sys'
-                    url = 'https://github.com/robphilipp'
-                }
-                developers {
-                    developer {
-                        id = "rob.philipp"
-                        name = "Rob Philipp"
-                        email = "rob.philipp@gmail.com"
-                    }
-                }
-                scm {
-                    connection = 'scm:git:git://github.com/robphilipp/hashed-wheel-timer.git'
-                    developerConnection = 'scm:git:ssh://git@github.com:robphilipp/hashed-wheel-timer.git'
+    publishing {
+        publications {
+            hashedWheelTimer(MavenPublication) {
+                pom {
+                    name = 'hashed-wheel-timer'
+                    description = 'hashed-wheel-timer with sub-millisecond resolution'
                     url = 'https://github.com/robphilipp/hashed-wheel-timer'
-                }
-                issueManagement {
-                    system = 'GitHub'
-                    url = 'https://github.com/robphilipp/hashed-wheel-timer/issues'
-                }
-            }
-            groupId = group
-            artifactId = appName
-            version = appVersion
-
-            from components.java
-
-            // create the sign pom artifact
-            pom.withXml {
-                def pomFile = file("${project.buildDir}/generated-pom.xml")
-                writeTo(pomFile)
-                def pomAscFile = signing.sign(pomFile).signatureFiles[0]
-                artifact(pomAscFile) {
-                    classifier = null
-                    extension = 'pom.asc'
-                }
-            }
-
-            artifact sourceJar
-
-            artifact javadocJar
-
-            // create the signed artifacts
-            project.tasks.signArchives.signatureFiles.each {
-                artifact(it) {
-                    def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
-                    if (matcher.find()) {
-                        classifier = matcher.group(1)
-                    } else {
-                        classifier = null
+                    licenses {
+                        license {
+                            name = 'Eclipse Public License - v 2.0'
+                            url = 'https://github.com/robphilipp/hashed-wheel-timer/LICENSE'
+                        }
                     }
-                    extension = 'jar.asc'
+                    organization {
+                        name = 'com.closure-sys'
+                        url = 'https://github.com/robphilipp'
+                    }
+                    developers {
+                        developer {
+                            id = "rob.philipp"
+                            name = "Rob Philipp"
+                            email = "rob.philipp@gmail.com"
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git:git://github.com/robphilipp/hashed-wheel-timer.git'
+                        developerConnection = 'scm:git:ssh://git@github.com:robphilipp/hashed-wheel-timer.git'
+                        url = 'https://github.com/robphilipp/hashed-wheel-timer'
+                    }
+                    issueManagement {
+                        system = 'GitHub'
+                        url = 'https://github.com/robphilipp/hashed-wheel-timer/issues'
+                    }
+                }
+                groupId = group
+                artifactId = appName
+                version = appVersion
+
+                from components.java
+
+                // create the sign pom artifact
+                pom.withXml {
+                    def pomFile = file("${project.buildDir}/generated-pom.xml")
+                    writeTo(pomFile)
+                    def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+                    artifact(pomAscFile) {
+                        classifier = null
+                        extension = 'pom.asc'
+                    }
+                }
+
+                artifact sourceJar
+
+                artifact javadocJar
+
+                // create the signed artifacts
+                project.tasks.signArchives.signatureFiles.each {
+                    artifact(it) {
+                        def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+                        if (matcher.find()) {
+                            classifier = matcher.group(1)
+                        } else {
+                            classifier = null
+                        }
+                        extension = 'jar.asc'
+                    }
                 }
             }
         }
-    }
-    repositories {
-        maven {
-            name = "nexus"
-            url = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-            credentials {
-                username (sonatypeUsername != null ? sonatypeUsername : '')
-                password (sonatypePassword != null ? sonatypePassword : '')
+        repositories {
+            maven {
+                name = "nexus"
+                url = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+                credentials {
+                    username sonatypeUsername
+                    password sonatypePassword
+                }
             }
         }
     }
