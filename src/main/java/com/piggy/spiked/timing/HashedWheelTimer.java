@@ -617,7 +617,7 @@ public class HashedWheelTimer {
         }
 
         /**
-         * Sets the default resolution ({@value DEFAULT_RESOLUTION} {@value DEFAULT_TIME_UNIT}) for the timer
+         * Sets the default resolution ({@value Builder#DEFAULT_RESOLUTION} milliseconds) for the timer
          * @return a reference to this builder for chaining
          */
         public Builder withDefaultResolution() {

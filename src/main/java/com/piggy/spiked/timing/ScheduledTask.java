@@ -209,6 +209,7 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
          *
          * @param timesAround The number of times around the timer the cursor needs to move before the task is executed
          * @param wheelOffset The offset in the wheel, from the current cursor, for the bucket that holds the task
+         * @return A reference to this builder for chaining
          */
         public Builder<T> withInitialDelayInfo(final int timesAround, final int wheelOffset) {
             this.wheelOffset = wheelOffset;
