@@ -6,7 +6,7 @@ apply plugin: 'idea'
 apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
-def langLevel = 1.8
+def langLevel = 1.10
 sourceCompatibility = langLevel
 targetCompatibility = langLevel
 
