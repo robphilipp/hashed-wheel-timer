@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing;
+package com.digitalcipher.spiked.timing;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-import static com.piggy.spiked.timing.ScheduleType.FIXED_DELAY;
-import static com.piggy.spiked.timing.ScheduleType.FIXED_RATE;
+import static com.digitalcipher.spiked.timing.ScheduleType.FIXED_DELAY;
+import static com.digitalcipher.spiked.timing.ScheduleType.FIXED_RATE;
 
 /**
  * Scheduled task that maintains its execution status state.

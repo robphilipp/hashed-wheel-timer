@@ -1,4 +1,4 @@
-//group 'com.piggy.spiked.timing'
+//group 'com.digitalcipher.spiked.timing'
 //version '0.0.2-SNAPSHOT'
 
 apply plugin: 'java'
@@ -22,7 +22,7 @@ idea {
     }
 }
 
-//group 'com.piggy.spiked.timing'
+//group 'com.digitalcipher.spiked.timing'
 //group 'com.closure-sys'
 group 'com.digitalcipher.spikes.timing'
 def appName = 'hashed-wheel-timer'

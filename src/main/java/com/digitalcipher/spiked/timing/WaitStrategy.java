@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing;
+package com.digitalcipher.spiked.timing;
 
 /**
  * The wait strategies. Busy-spin and yielding wait seem to have about the same accuracy,

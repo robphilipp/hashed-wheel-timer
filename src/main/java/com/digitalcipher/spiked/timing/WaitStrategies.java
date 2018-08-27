@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing;
+package com.digitalcipher.spiked.timing;
 
 import java.util.Arrays;
 import java.util.Optional;
