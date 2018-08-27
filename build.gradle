@@ -3,6 +3,7 @@
 
 apply plugin: 'java'
 apply plugin: 'idea'
+apply plugin: 'groovy'
 apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
@@ -22,7 +23,8 @@ idea {
 }
 
 //group 'com.piggy.spiked.timing'
-group 'com.closure-sys'
+//group 'com.closure-sys'
+group 'com.digitalcipher.spikes.timing'
 def appName = 'hashed-wheel-timer'
 //def appVersion = '0.0.2-SNAPSHOT'
 def appVersion = '0.0.2'
@@ -148,6 +150,8 @@ configurations {
 }
 
 test {
+    useJUnit()
+
     // show standard out and standard error of the test JVM(s) on the console
     testLogging.showStandardStreams = true
 }
@@ -161,8 +165,6 @@ dependencies {
     testCompile "org.spockframework:spock-core:1.1-groovy-2.4"
     testCompile 'ch.qos.logback:logback-classic:1.0.13'
     testCompile 'junit:junit:4.12'
-
-    testRuntime 'com.athaydes:spock-reports:1.2.7'
 }
 
 task wrapper(type: Wrapper) {
