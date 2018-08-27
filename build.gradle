@@ -22,8 +22,6 @@ idea {
     }
 }
 
-//group 'com.digitalcipher.spiked.timing'
-//group 'com.closure-sys'
 group 'com.digitalcipher.spikes.timing'
 def appName = 'hashed-wheel-timer'
 //def appVersion = '0.0.2-SNAPSHOT'
