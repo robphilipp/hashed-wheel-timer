@@ -89,7 +89,7 @@ the hashed-wheel below.
 
 It has 16 buckets, which is equivalent to saying that it has a wheel-size of 16. The arrow in the center
 is the cursor, which represents the current time. As time advances, the cursor advances as well. The
-amount of tine represented by each bucket is specified by the timer's resolution parameter. For example,
+amount of time represented by each bucket is specified by the timer's resolution parameter. For example,
 if in this case the resolution is 1 second, then each bucket in the diagram represents 1 second, and the
 cursor advances 1 second at a time. In this case, it would take 16 seconds for the cursor to make one
 complete revolution.
@@ -118,9 +118,9 @@ the cursor has passed them, counting down until they are ready to be executed.
 
 The resolution determines the accuracy of actual delay of the executed task. For example a resolution of
 1 seconds means that a delay of 3.24 seconds will be executed in 3 or 4 seconds, depending on the
-time the tasks was scheduled, relative to the amount of tine the cursor is in its current bucket. Although
+time the task was scheduled, relative to the amount of time the cursor has been in its current bucket. Although
 the resolution is a good approximation to the accuracy for 1 ms resolutions or more, for resolutions
-less then 1 ms (i.e. 100 µs) the word "approximate" becomes important.
+less then 1 ms (i.e. 100 µs) the word "approximate" must be emphasised.
 
 Generally, a wheel size of 512 is reasonable, but this all depends on your situation.
 
