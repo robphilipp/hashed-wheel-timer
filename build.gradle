@@ -1,13 +1,156 @@
-group 'com.piggy.spiked.timing'
-version '0.0.1'
+//group 'com.digitalcipher.spiked.timing'
+//version '0.0.2-SNAPSHOT'
 
 apply plugin: 'java'
 apply plugin: 'idea'
+apply plugin: 'groovy'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
 
-sourceCompatibility = 1.10
+def langLevel = 1.10
+sourceCompatibility = langLevel
+targetCompatibility = langLevel
 
 repositories {
     mavenCentral()
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
+
+group 'com.digitalcipher'
+def appName = 'hashed-wheel-timer'
+def appVersion = '0.0.3'
+
+task sourceJar(type: Jar) {
+    classifier = "sources"
+    from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives jar
+    archives sourceJar
+    archives javadocJar
+}
+
+if(hasProperty('sonatypeUsername')) {
+    signing {
+        sign configurations.archives
+    }
+
+    publishing {
+        publications {
+            hashedWheelTimer(MavenPublication) {
+                pom {
+                    name = 'hashed-wheel-timer'
+                    description = 'hashed-wheel-timer with sub-millisecond resolution'
+                    url = 'https://github.com/robphilipp/hashed-wheel-timer'
+                    licenses {
+                        license {
+                            name = 'Eclipse Public License - v 2.0'
+                            url = 'https://github.com/robphilipp/hashed-wheel-timer/LICENSE'
+                        }
+                    }
+                    organization {
+                        name = 'com.digitalcipher'
+                        url = 'https://github.com/robphilipp'
+                    }
+                    developers {
+                        developer {
+                            id = "rob.philipp"
+                            name = "Rob Philipp"
+                            email = "rob.philipp@gmail.com"
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git:git://github.com/robphilipp/hashed-wheel-timer.git'
+                        developerConnection = 'scm:git:ssh://git@github.com:robphilipp/hashed-wheel-timer.git'
+                        url = 'https://github.com/robphilipp/hashed-wheel-timer'
+                    }
+                    issueManagement {
+                        system = 'GitHub'
+                        url = 'https://github.com/robphilipp/hashed-wheel-timer/issues'
+                    }
+                }
+                groupId = group
+                artifactId = appName
+                version = appVersion
+
+                from components.java
+
+                // create the sign pom artifact
+                pom.withXml {
+                    def pomFile = file("${project.buildDir}/generated-pom.xml")
+                    writeTo(pomFile)
+                    def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+                    artifact(pomAscFile) {
+                        classifier = null
+                        extension = 'pom.asc'
+                    }
+                }
+
+                artifact sourceJar
+
+                artifact javadocJar
+
+                // create the signed artifacts
+                project.tasks.signArchives.signatureFiles.each {
+                    artifact(it) {
+                        def matcher = it.file =~ /-(sources|javadoc)\.jar\.asc$/
+                        if (matcher.find()) {
+                            classifier = matcher.group(1)
+                        } else {
+                            classifier = null
+                        }
+                        extension = 'jar.asc'
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                name = "nexus"
+                url = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+                credentials {
+                    username sonatypeUsername
+                    password sonatypePassword
+                }
+            }
+        }
+    }
+}
+
+jar {
+    if( project.hasProperty( 'env' ) && project.properties[ 'env' ] == 'prod' ) {
+        println('**==----< Prod build >----==**')
+        archivesBaseName = baseName
+        println("base: ${archivesBaseName}")
+    }
+    else {
+        println('**==----< Dev build >----==**')
+        archivesBaseName = baseName + '-' + appVersion
+        println("base: ${archivesBaseName}")
+    }
+}
+
+configurations {
+    providedRuntime
+}
+
+test {
+    useJUnit()
+
+    // show standard out and standard error of the test JVM(s) on the console
+    testLogging.showStandardStreams = true
 }
 
 dependencies {
@@ -19,4 +162,8 @@ dependencies {
     testCompile "org.spockframework:spock-core:1.1-groovy-2.4"
     testCompile 'ch.qos.logback:logback-classic:1.0.13'
     testCompile 'junit:junit:4.12'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.9'
 }

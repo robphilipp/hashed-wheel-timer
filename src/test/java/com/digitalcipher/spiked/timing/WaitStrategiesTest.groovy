@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing
+package com.digitalcipher.spiked.timing
 
 import spock.lang.Specification
 import spock.lang.Unroll

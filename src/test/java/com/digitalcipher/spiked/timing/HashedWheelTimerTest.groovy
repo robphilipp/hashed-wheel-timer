@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing
+package com.digitalcipher.spiked.timing
 
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -86,7 +86,7 @@ class HashedWheelTimerTest extends Specification {
         def actualDelay = executedTime - start
 
         then: "the actual delay should be at least the specified delay"
-        actualDelay > TimeUnit.NANOSECONDS.convert(delay, units)
+        actualDelay > TimeUnit.NANOSECONDS.convert(delay - 10, units)
 
         cleanup: "shutdown the timer"
         timer.shutdown()

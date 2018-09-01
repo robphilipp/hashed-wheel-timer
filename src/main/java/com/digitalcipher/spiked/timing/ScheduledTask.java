@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing;
+package com.digitalcipher.spiked.timing;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-import static com.piggy.spiked.timing.ScheduleType.FIXED_DELAY;
-import static com.piggy.spiked.timing.ScheduleType.FIXED_RATE;
+import static com.digitalcipher.spiked.timing.ScheduleType.FIXED_DELAY;
+import static com.digitalcipher.spiked.timing.ScheduleType.FIXED_RATE;
 
 /**
  * Scheduled task that maintains its execution status state.
@@ -209,6 +209,7 @@ public class ScheduledTask<T> extends CompletableFuture<T> {
          *
          * @param timesAround The number of times around the timer the cursor needs to move before the task is executed
          * @param wheelOffset The offset in the wheel, from the current cursor, for the bucket that holds the task
+         * @return A reference to this builder for chaining
          */
         public Builder<T> withInitialDelayInfo(final int timesAround, final int wheelOffset) {
             this.wheelOffset = wheelOffset;

@@ -1,4 +1,4 @@
-package com.piggy.spiked.timing;
+package com.digitalcipher.spiked.timing;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -33,6 +33,7 @@ public class WaitStrategies {
      * Spins in the loop until the deadline is reached. In a multi-core environment,
      * will occupy an entire core. Is more precise than Sleep wait strategy, but
      * consumes more resources.
+     * @return A {@link WaitStrategy.BusySpinWait} instances
      */
     public static WaitStrategy.BusySpinWait busySpinWait() {
         return new WaitStrategy.BusySpinWait();
@@ -44,6 +45,7 @@ public class WaitStrategies {
      * Spins in the loop, until the deadline is reached. Releases the flow control
      * by means of Thread.yield() call. This strategy is less precise than BusySpin
      * one, but is more scheduler-friendly.
+     * @return A {@link WaitStrategy.YieldingWait} instances
      */
     public static WaitStrategy.YieldingWait yieldingWait() {
         return new WaitStrategy.YieldingWait();
@@ -55,6 +57,7 @@ public class WaitStrategies {
      * Will release the flow control, giving other threads a possibility of execution
      * on the same processor. Uses less resources than BusySpin wait, but is less
      * precise.
+     * @return A {@link WaitStrategy.SleepWait} instances
      */
     public static WaitStrategy.SleepWait sleepWait() {
         return new WaitStrategy.SleepWait();
