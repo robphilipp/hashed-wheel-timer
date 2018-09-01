@@ -24,7 +24,6 @@ idea {
 
 group 'com.digitalcipher'
 def appName = 'hashed-wheel-timer'
-//def appVersion = '0.0.2-SNAPSHOT'
 def appVersion = '0.0.3'
 
 task sourceJar(type: Jar) {
