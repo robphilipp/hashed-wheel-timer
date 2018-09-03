@@ -16,19 +16,19 @@ The hash-wheel-timer JAR can be found in the maven central with coordinates:
 
 - group ID: `com.digitalcipher`
 - artifact ID: `hashed-wheel-timer`
-- version: `0.0.3`
+- version: `0.0.4`
 
 For gradle builds:
 
 ```groovy
-compile 'com.digitalcipher:hashed-wheel-timer:0.0.3'
+compile 'com.digitalcipher:hashed-wheel-timer:0.0.4'
 ```
 or
 ```xml
 <dependency>
   <groupId>com.digitalcipher</groupId>
   <artifactId>hashed-wheel-timer</artifactId>
-  <version>0.0.3</version>
+  <version>0.0.4</version>
   <type>pom</type>
 </dependency>
 ```
