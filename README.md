@@ -12,10 +12,27 @@ Benchmarks and example code can be found in the [benchmark repository](https://g
 
 ## using the timer
 
-The hash-wheel-timer JAR can be found in the maven central with coordinates (for gradle builds)
+The hash-wheel-timer JAR can be found in the maven central with coordinates:
+
+- group ID: `com.digitalcipher`
+- artifact ID: `hashed-wheel-timer`
+- version: `0.0.3`
+
+For gradle builds:
+
 ```groovy
 compile 'com.digitalcipher:hashed-wheel-timer:0.0.3'
 ```
+or
+```xml
+<dependency>
+  <groupId>com.digitalcipher</groupId>
+  <artifactId>hashed-wheel-timer</artifactId>
+  <version>0.0.3</version>
+  <type>pom</type>
+</dependency>
+```
+for maven builds.
 
 Use the `HashedWheelTimer.Builder` To construct a timer instance
 ```java
@@ -102,7 +119,7 @@ in 5 seconds.
 
 Advancing the cursor to the next bucket relies on the **wait-strategy**. The hashed-wheel timer
 implementation checks periodically to see if the cursor is ready to be advanced. In the most simplistic
-approach, a loop runs on a separated thread that checks the current time (in nanoseconds) to see
+approach, a loop runs on a separate thread that checks the current time (in nanoseconds) to see
 if it has passed the beginning of the next bucket, in which case it advances the cursor. If the current
 time has not advanced past the current bucket, then it checks again. This simplistic approach is the
 **busySpin** wait strategy. There are two other strategies as well: **yieldingWait** and **sleepWait**.
