@@ -100,7 +100,7 @@ public class HashedWheelTimer {
      * @param timerName The name of the timer
      * @return a single-thread executor with a factory to name the threads
      */
-    private ExecutorService timerExecutorService(final String timerName) {
+    private static ExecutorService timerExecutorService(final String timerName) {
         return Executors.newSingleThreadExecutor(new ThreadFactory() {
             final AtomicInteger numThreads = new AtomicInteger();
 
@@ -132,6 +132,7 @@ public class HashedWheelTimer {
      */
     public void shutdown() {
         loop.shutdown();
+        waitStrategy.shutdown();
         executor.shutdown();
     }
 
@@ -141,6 +142,7 @@ public class HashedWheelTimer {
      */
     public List<Runnable> shutdownNow() {
         loop.shutdownNow();
+        waitStrategy.shutdown();
         return executor.shutdownNow();
     }
 
@@ -182,35 +184,41 @@ public class HashedWheelTimer {
         return () -> {
             long deadline = System.nanoTime();
             boolean interrupted;
-            do {
-                // grab and update the current cursor
-                lock.lock();
-                final int currentCursor = cursor.getAndUpdate(val -> (val + 1) % wheelSize);
+            try {
+                do {
+                    // grab and update the current cursor
+                    lock.lock();
+                    final int currentCursor = cursor.getAndUpdate(val -> (val + 1) % wheelSize);
 
-                // update the scheduled tasks
-                wheel.computeIfPresent(wheelIndex(currentCursor), (index, scheduledTasks) -> {
-                    // update the registration list based on the results of the call to process the task
-                    // the task.process does the following:
-                    // 1. executes the task if ready
-                    // 2. reschedules the task after processing for periodic tasks,
-                    // and upon completion, returns
-                    // 1. null if cancelled or after one-shot has executed
-                    // 2. the task if rescheduled
-                    // All the tasks that are set to null (i.e. cancelled or one-shot) are removed from
-                    // the list.
-                    scheduledTasks.removeIf(task -> Objects.isNull(task.process()));  // < 1 µs with no tasks, approx. 40 to 80 µs with tasks
-                    return scheduledTasks;
-                });
-                lock.unlock();
+                    // update the scheduled tasks
+                    wheel.computeIfPresent(wheelIndex(currentCursor), (index, scheduledTasks) -> {
+                        // update the registration list based on the results of the call to process the task
+                        // the task.process does the following:
+                        // 1. executes the task if ready
+                        // 2. reschedules the task after processing for periodic tasks,
+                        // and upon completion, returns
+                        // 1. null if cancelled or after one-shot has executed
+                        // 2. the task if rescheduled
+                        // All the tasks that are set to null (i.e. cancelled or one-shot) are removed from
+                        // the list.
+                        scheduledTasks.removeIf(task -> Objects.isNull(task.process()));  // < 1 µs with no tasks, approx. 40 to 80 µs with tasks
+                        return scheduledTasks;
+                    });
+                    lock.unlock();
 
-                // updates the deadline for the registrations in the next wheel bucket, and provides a
-                // catch-up in case the registration updates take more than the resolution
-                final long currentTime = System.nanoTime();
-                deadline = Math.max(deadline + resolution, currentTime);
+                    // updates the deadline for the registrations in the next wheel bucket, and provides a
+                    // catch-up in case the registration updates take more than the resolution
+                    final long currentTime = System.nanoTime();
+                    deadline = Math.max(deadline + resolution, currentTime);
 
-                // wait for the deadline if it isn't equal to the current time
-                interrupted = deadline != currentTime && waitStrategy.waitUntil(deadline);
-            } while (!interrupted);
+                    // wait for the deadline if it isn't equal to the current time
+                    interrupted = deadline != currentTime && waitStrategy.waitUntil(deadline).get();
+                } while(!interrupted);
+            }
+            catch(InterruptedException | ExecutionException e) {
+                LOGGER.error("timer shutdown due to error: exception: {}", e.getMessage());
+                shutdownNow();
+            }
         };
     }
 
